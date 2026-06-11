@@ -3,6 +3,7 @@
 // - Card 1: Partidos del día (solo banderas, nombres, marcadores)
 // - Card 2: Finalistas (Ciclo 2) - badge PULSO solo si NO ha hecho pronóstico
 // - Card 3: Reglas del juego
+// - Badges en Card 1: EN VIVO (único) y TERMINADO
 
 import { simGetFechaStr, simGetHoraStr, onSimuladorCambio } from './lab.js';
 import { gruposSeleccion, finalistasSeleccion } from './especiales.js';
@@ -126,13 +127,34 @@ function tieneAlgunFinalista() {
 
 function getEstadoPartido(partido) {
     const est = Number(partido.est);
+    
+    // TERMINADO
     if (est === 4) {
-        return { estado: 'terminado', texto: 'Terminado', icono: '🏁', clase: 'badge-terminado' };
-    } else if (est === 1 || est === 2) {
-        return { estado: 'activo', texto: 'Abierto', icono: '🟢', clase: 'badge-activo' };
-    } else {
-        return { estado: 'pendiente', texto: 'Próximamente', icono: '⏳', clase: 'badge-pendiente' };
+        return { 
+            estado: 'terminado', 
+            texto: 'TERMINADO',
+            icono: '🏁',
+            clase: 'badge-terminado'
+        };
     }
+    
+    // EN VIVO (est = 2 o 3)
+    if (est === 2 || est === 3) {
+        return { 
+            estado: 'envivo', 
+            texto: 'EN VIVO',
+            icono: '🟡',
+            clase: 'badge-envivo'
+        };
+    }
+    
+    // ANTES DEL PARTIDO (est = 1 o cualquier otro)
+    return { 
+        estado: 'pendiente', 
+        texto: '',
+        icono: '',
+        clase: ''
+    };
 }
 
 function getResultadoReal(partidoId) { 
@@ -176,24 +198,34 @@ function renderizarPartidosDelDia() {
         let marcadorHtml = '';
         
         if (estado.estado === 'terminado' && resultadoReal) {
+            // Partido terminado: mostrar resultado real con badge TERMINADO
             marcadorHtml = `
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="font-weight: 600; color: #1c1c1e;">${resultadoReal.gol_loc}</span>
                     <span style="color: #8e8e93;">-</span>
                     <span style="font-weight: 600; color: #1c1c1e;">${resultadoReal.gol_vis}</span>
-                    <span style="background: #34c75920; color: #34c759; padding: 2px 6px; border-radius: 10px; font-size: 9px; font-weight: 600;">FIN</span>
+                    <span style="background: #34c75920; color: #34c759; padding: 2px 6px; border-radius: 10px; font-size: 9px; font-weight: 600;">🏁 TERMINADO</span>
+                </div>
+            `;
+        } else if (estado.estado === 'envivo') {
+            // Partido EN VIVO: solo un badge (sin duplicar)
+            marcadorHtml = `
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="color: #ff9500; font-size: 11px; font-weight: 500;">🔴</span>
+                    <span style="background: #ff950020; color: #ff9500; padding: 2px 6px; border-radius: 10px; font-size: 9px; font-weight: 600;">EN VIVO</span>
                 </div>
             `;
         } else if (pronostico) {
+            // Partido no iniciado con pronóstico
             marcadorHtml = `
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="font-weight: 500; color: #007aff;">${pronostico.s1}</span>
                     <span style="color: #8e8e93;">-</span>
                     <span style="font-weight: 500; color: #007aff;">${pronostico.s2}</span>
-                    <span style="background: #007aff10; color: #007aff; padding: 2px 6px; border-radius: 10px; font-size: 9px; font-weight: 500;">⚽</span>
                 </div>
             `;
         } else {
+            // Partido no iniciado sin pronóstico
             marcadorHtml = `
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="color: #8e8e93;">?</span>
@@ -375,6 +407,7 @@ async function renderizarAhoraContent() {
             </div>
             
             <div class="ahora-cards">
+                <!-- CARD 1: PARTIDOS DEL DÍA -->
                 <div class="ahora-card" data-accion="partidos">
                     <div class="ahora-card-header">
                         <div class="ahora-card-icono">⚽</div>
@@ -386,6 +419,7 @@ async function renderizarAhoraContent() {
                     </div>
                 </div>
                 
+                <!-- CARD 2: FINALISTAS -->
                 <div class="ahora-card" data-accion="ciclo2">
                     <div class="ahora-card-header">
                         <div class="ahora-card-icono">🏆</div>
@@ -398,6 +432,7 @@ async function renderizarAhoraContent() {
                     </div>
                 </div>
                 
+                <!-- CARD 3: REGLAS -->
                 <div class="ahora-card" data-accion="reglas">
                     <div class="ahora-card-header">
                         <div class="ahora-card-icono">📖</div>
@@ -419,7 +454,6 @@ async function renderizarAhoraContent() {
     return html;
 }
 
-// ========== EXPORTACIÓN PRINCIPAL ==========
 export async function renderizarAhora(contenedor, datosCuenta) {
     if (!contenedor) return;
     currentContenedor = contenedor;
