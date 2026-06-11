@@ -1,21 +1,19 @@
 // funciones/partidos.js
 // Módulo de Partidos - La Polla Mundialista 2026
-// VERSIÓN DEFINITIVA CON FEEDBACK INMEDIATO Y SINCRONIZACIÓN EN SEGUNDO PLANO
+// VERSIÓN CON BADGES SIMPLIFICADOS: EN VIVO y TERMINADO
 // - Tabs: TODOS, GRUPOS, COLOMBIA
 // - Tab TODOS muestra SOLO fase de grupos (72 partidos)
-// - Control por `est` (Velneo) con nuevos estados: 1=PULSO100, 2=PULSO50, 3=ENTRETIEMPO, 4=TERMINADO
+// - Control por `est` (Velneo): 1=Antes del partido, 2/3=EN VIVO, 4=TERMINADO
 // - Countdown con hora REAL del dispositivo
 // - Mapeo hardcodeado de grupos (48 equipos)
 // - Scroll inteligente solo en pestaña TODOS
 // - Botón K con bandera 🇨🇴
 // - Modal con fondo de estadio CSS puro (sin imágenes)
-// - CORREGIDO: Inputs tipo text con inputmode numeric para Android (evita scroll errático)
+// - CORREGIDO: Inputs tipo text con inputmode numeric para Android
 // - CORREGIDO: Gap reducido entre botones y inputs
-// - CORREGIDO: Validación de solo números en inputs
 // - NUEVO: Feedback inmediato al guardar (muestra el marcador temporal)
 // - NUEVO: Sincronización en segundo plano cada 30 segundos
-// - NUEVO: Si Velneo tiene otro valor, corrige automáticamente
-// - NUEVO: Al guardar el partido inaugural (ID=1), vuelve a la pestaña AHORA
+// - NUEVO: Badges simplificados: solo EN VIVO (est=2/3) y TERMINADO (est=4)
 
 import { onSimuladorCambio, simGetFechaStr, simGetHoraStr } from './lab.js';
 import { gruposSeleccion } from './especiales.js';
@@ -26,67 +24,21 @@ const BASE = 'https://server.sion.hysintegrar.com/fifa2026/vERP_2_dat_dat/v1';
 const BASE_V2 = 'https://server.sion.hysintegrar.com/fifa2026/vERP_2_dat_dat/v2';
 const KEY = 'SuzvTp4qwXQtAVFJbdzP';
 
-// ========== MAPEO HARCODEADO DE GRUPOS (basado en sorteo oficial) ==========
+// ========== MAPEO HARCODEADO DE GRUPOS ==========
 const GRUPOS_POR_EQUIPO = {
-    'México': 'A',
-    'Sudáfrica': 'A',
-    'República de Corea': 'A',
-    'Corea': 'A',
-    'Corea del Sur': 'A',
-    'República Checa': 'A',
-    'Chequia': 'A',
-    'Canadá': 'B',
-    'Bosnia': 'B',
-    'Bosnia y Herzegovina': 'B',
-    'Catar': 'B',
-    'Suiza': 'B',
-    'Brasil': 'C',
-    'Marruecos': 'C',
-    'Haití': 'C',
-    'Escocia': 'C',
-    'Estados Unidos': 'D',
-    'EE. UU.': 'D',
-    'Paraguay': 'D',
-    'Australia': 'D',
-    'Turquía': 'D',
-    'Alemania': 'E',
-    'Curazao': 'E',
-    'Costa de Marfil': 'E',
-    'C. de Marfil': 'E',
-    'Ecuador': 'E',
-    'Países Bajos': 'F',
-    'Japón': 'F',
-    'Suecia': 'F',
-    'Tunez': 'F',
-    'Bélgica': 'G',
-    'Egipto': 'G',
-    'Irán': 'G',
-    'RI de Irán': 'G',
-    'Nueva Zelanda': 'G',
-    'N. Zelanda': 'G',
-    'España': 'H',
-    'Islas de Cabo Verde': 'H',
-    'Cabo Verde': 'H',
-    'Arabia Saudí': 'H',
-    'Arabia Saudita': 'H',
-    'Uruguay': 'H',
-    'Francia': 'I',
-    'Senegal': 'I',
-    'Irak': 'I',
-    'Noruega': 'I',
-    'Argentina': 'J',
-    'Argelia': 'J',
-    'Austria': 'J',
-    'Jordania': 'J',
-    'Portugal': 'K',
-    'RD Congo': 'K',
-    'República Democrática del Congo': 'K',
-    'Uzbekistán': 'K',
-    'Colombia': 'K',
-    'Inglaterra': 'L',
-    'Croacia': 'L',
-    'Ghana': 'L',
-    'Panamá': 'L'
+    'México': 'A', 'Sudáfrica': 'A', 'República de Corea': 'A', 'Corea': 'A',
+    'Corea del Sur': 'A', 'República Checa': 'A', 'Chequia': 'A',
+    'Canadá': 'B', 'Bosnia': 'B', 'Bosnia y Herzegovina': 'B', 'Catar': 'B', 'Suiza': 'B',
+    'Brasil': 'C', 'Marruecos': 'C', 'Haití': 'C', 'Escocia': 'C',
+    'Estados Unidos': 'D', 'EE. UU.': 'D', 'Paraguay': 'D', 'Australia': 'D', 'Turquía': 'D',
+    'Alemania': 'E', 'Curazao': 'E', 'Costa de Marfil': 'E', 'C. de Marfil': 'E', 'Ecuador': 'E',
+    'Países Bajos': 'F', 'Japón': 'F', 'Suecia': 'F', 'Tunez': 'F',
+    'Bélgica': 'G', 'Egipto': 'G', 'Irán': 'G', 'RI de Irán': 'G', 'Nueva Zelanda': 'G', 'N. Zelanda': 'G',
+    'España': 'H', 'Islas de Cabo Verde': 'H', 'Cabo Verde': 'H', 'Arabia Saudí': 'H', 'Arabia Saudita': 'H', 'Uruguay': 'H',
+    'Francia': 'I', 'Senegal': 'I', 'Irak': 'I', 'Noruega': 'I',
+    'Argentina': 'J', 'Argelia': 'J', 'Austria': 'J', 'Jordania': 'J',
+    'Portugal': 'K', 'RD Congo': 'K', 'República Democrática del Congo': 'K', 'Uzbekistán': 'K', 'Colombia': 'K',
+    'Inglaterra': 'L', 'Croacia': 'L', 'Ghana': 'L', 'Panamá': 'L'
 };
 
 function obtenerGrupoPorEquipo(nombreEquipo) {
@@ -99,13 +51,17 @@ let partidosCache = [], equiposCache = [], pronosticosCache = {}, resultadosReal
 let tabActivo = 'todos', grupoActivo = 'A', simuladorSuscrito = false, currentJugador = null;
 let countdownInterval = null;
 let countdownActivo = false;
-let syncIntervals = new Map(); // Para almacenar intervalos de sincronización por partido
-let tempPronosticos = new Map(); // Almacenar marcadores temporales {ptdId: {s1, s2, timestamp}}
-let globalCambiarVistaCallback = null; // Para volver a AHORA después de guardar el inaugural
+let syncIntervals = new Map();
+let tempPronosticos = new Map();
+let globalCambiarVistaCallback = null;
 
 function mostrarToast(msg, tipo) {
     const toast = document.getElementById('app-toast');
     if (toast) { toast.textContent = msg; toast.className = 'toast ' + (tipo || ''); toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 3000); }
+}
+
+export function setGlobalCambiarVistaCallback(callback) {
+    globalCambiarVistaCallback = callback;
 }
 
 function obtenerFechaReal() {
@@ -119,11 +75,6 @@ function obtenerFechaReal() {
         fecha: `${year}-${month}-${day}`,
         hora: `${hours}:${minutes}`
     };
-}
-
-// Función para registrar el callback de cambio de vista (será llamado desde frontpage.js)
-export function setGlobalCambiarVistaCallback(callback) {
-    globalCambiarVistaCallback = callback;
 }
 
 function formatearFecha(fechaStr) {
@@ -155,7 +106,6 @@ function formatearCountdown(dias, horas, minutos, segundos) {
     if (horas > 0) partes.push(`${horas} ${horas === 1 ? 'hora' : 'horas'}`);
     if (minutos > 0) partes.push(`${minutos} ${minutos === 1 ? 'minuto' : 'minutos'}`);
     if (segundos > 0 && dias === 0 && horas === 0) partes.push(`${segundos} ${segundos === 1 ? 'segundo' : 'segundos'}`);
-    
     if (partes.length === 0) return 'Faltan menos de un minuto';
     if (partes.length === 1) return `Faltan ${partes[0]}`;
     if (partes.length === 2) return `Faltan ${partes[0]} y ${partes[1]}`;
@@ -175,13 +125,9 @@ async function cargarPartidos() {
         
         partidosCache.forEach(p => {
             let grupo = obtenerGrupoPorEquipo(p.nom_loc);
-            if (!grupo) {
-                grupo = obtenerGrupoPorEquipo(p.nom_vis);
-            }
+            if (!grupo) grupo = obtenerGrupoPorEquipo(p.nom_vis);
             p.grupoCalculado = grupo;
-            if (!p.grp_for && grupo) {
-                p.grp_for = grupo;
-            }
+            if (!p.grp_for && grupo) p.grp_for = grupo;
         });
         
         console.log('[Partidos] Cargados y asignados grupos a', partidosCache.length, 'partidos');
@@ -190,11 +136,7 @@ async function cargarPartidos() {
         const dataReales = await responseReales.json();
         resultadosRealesCache = {};
         (dataReales.fifa_ptd || []).forEach(p => { 
-            resultadosRealesCache[p.id] = { 
-                gol_loc: p.t90_gol_loc, 
-                gol_vis: p.t90_gol_vis, 
-                est: p.est 
-            }; 
+            resultadosRealesCache[p.id] = { gol_loc: p.t90_gol_loc, gol_vis: p.t90_gol_vis, est: p.est }; 
         });
         
         return partidosCache;
@@ -211,14 +153,59 @@ async function cargarEquipos() {
         equiposCache = (await response.json()).fifa_equ || []; 
         console.log(`[Partidos] Cargados ${equiposCache.length} equipos`);
         return equiposCache; 
-    } 
-    catch (error) { 
+    } catch (error) { 
         console.error('Error cargando equipos:', error); 
         return []; 
     }
 }
 
-// ========== FUNCIÓN PARA OBTENER PRONÓSTICO ACTUAL DE VELNEO ==========
+// ========== ESTADOS SIMPLIFICADOS: EN VIVO y TERMINADO ==========
+function getEstadoPartidoPorEst(partido) {
+    const est = Number(partido.est);
+    
+    // TERMINADO
+    if (est === 4) {
+        return { 
+            estado: 'terminado', 
+            texto: 'TERMINADO',
+            icono: '🏁',
+            editable: false,
+            visible: true,
+            puntosBase: getPtsBase(partido.fas)
+        };
+    }
+    
+    // EN VIVO (est = 2 o 3)
+    if (est === 2 || est === 3) {
+        return { 
+            estado: 'envivo', 
+            texto: 'EN VIVO',
+            icono: '🟡',
+            editable: false,
+            visible: true,
+            puntosBase: 0
+        };
+    }
+    
+    // ANTES DEL PARTIDO (est = 1 o cualquier otro)
+    return { 
+        estado: 'pendiente', 
+        texto: '',
+        icono: '',
+        editable: true,
+        visible: true,
+        puntosBase: getPtsBase(partido.fas)
+    };
+}
+
+function getMarcadorEnVivo(partido) {
+    const est = Number(partido.est);
+    if (est === 2 || est === 3) {
+        return { tieneMarcador: false, texto: '🔴 EN VIVO' };
+    }
+    return null;
+}
+
 async function obtenerPronosticoActual(ptdId) {
     if (!currentJugador) return null;
     try {
@@ -236,26 +223,18 @@ async function obtenerPronosticoActual(ptdId) {
     }
 }
 
-// ========== FUNCIÓN PARA SINCRONIZAR CON VELNEO ==========
 async function sincronizarConVelneo(ptdId) {
     if (!currentJugador) return;
-    
     try {
         const valorActual = await obtenerPronosticoActual(ptdId);
-        
         if (valorActual) {
-            // Actualizar cache
             pronosticosCache[ptdId] = valorActual;
             guardarPronosticosPartidosLocal(pronosticosCache);
-            
-            // Verificar si el temporal es diferente
             const temp = tempPronosticos.get(ptdId);
             if (temp && (temp.s1 !== valorActual.s1 || temp.s2 !== valorActual.s2)) {
                 console.log(`[Sync] Partido ${ptdId}: temporal ${temp.s1}-${temp.s2} vs Velneo ${valorActual.s1}-${valorActual.s2}`);
                 actualizarCardPartido(ptdId, valorActual.s1, valorActual.s2);
             }
-            
-            // Limpiar temporal y eliminar intervalo
             tempPronosticos.delete(ptdId);
             if (syncIntervals.has(ptdId)) {
                 clearTimeout(syncIntervals.get(ptdId));
@@ -267,31 +246,19 @@ async function sincronizarConVelneo(ptdId) {
     }
 }
 
-// ========== FUNCIÓN PARA INICIAR SINCRONIZACIÓN PERIÓDICA ==========
 function iniciarSincronizacionPeriodica(ptdId, s1, s2) {
-    // Limpiar timeout anterior si existe
     if (syncIntervals.has(ptdId)) {
         clearTimeout(syncIntervals.get(ptdId));
         syncIntervals.delete(ptdId);
     }
-    
-    // Guardar marcador temporal
     tempPronosticos.set(ptdId, { s1, s2, timestamp: Date.now() });
-    
-    // Programar sincronización única después de 30 segundos
-    const timeoutId = setTimeout(() => {
-        sincronizarConVelneo(ptdId);
-    }, 30000);
-    
+    const timeoutId = setTimeout(() => { sincronizarConVelneo(ptdId); }, 30000);
     syncIntervals.set(ptdId, timeoutId);
 }
 
-// ========== FUNCIÓN PARA ACTUALIZAR SOLO UNA CARD ESPECÍFICA ==========
 function actualizarCardPartido(ptdId, s1, s2) {
     const card = document.querySelector(`.partido-card[data-id="${ptdId}"]`);
     if (!card) return;
-    
-    // Buscar el contenedor del pronóstico dentro de la card
     const pronosticoContainer = card.querySelector('.pronostico-container');
     if (pronosticoContainer) {
         pronosticoContainer.innerHTML = `
@@ -310,8 +277,6 @@ function actualizarCardPartido(ptdId, s1, s2) {
 
 async function cargarPronosticos(jugId, forceRefresh = false) {
     if (!jugId) return;
-    
-    // Si no es forceRefresh, intentar usar localStorage
     if (!forceRefresh) {
         const locales = cargarPronosticosPartidosLocal();
         if (locales && Object.keys(locales).length > 0) { 
@@ -320,8 +285,6 @@ async function cargarPronosticos(jugId, forceRefresh = false) {
             return; 
         }
     }
-    
-    // Si forceRefresh es true o no hay datos en localStorage, consultar a Velneo
     try {
         const timestamp = Date.now();
         const response = await fetch(`${BASE_V2}/fifa_jug_pro?api_key=${KEY}&filter[id]=${jugId}&fields=jug,jug.name,id,ptd,pro_gol_loc,pro_gol_vis,pro_res&_=${timestamp}`);
@@ -329,7 +292,7 @@ async function cargarPronosticos(jugId, forceRefresh = false) {
         pronosticosCache = {};
         pronosticos.forEach(p => { pronosticosCache[p.ptd] = { s1: p.pro_gol_loc || 0, s2: p.pro_gol_vis || 0 }; });
         guardarPronosticosPartidosLocal(pronosticosCache);
-        console.log(`[Partidos] ✅ ${Object.keys(pronosticosCache).length} pronósticos desde API (Velneo)`);
+        console.log(`[Partidos] ✅ ${Object.keys(pronosticosCache).length} pronósticos desde API`);
     } catch (error) { 
         console.error('Error cargando pronósticos:', error); 
     }
@@ -337,79 +300,6 @@ async function cargarPronosticos(jugId, forceRefresh = false) {
 
 function actualizarLocalStorage() { 
     guardarPronosticosPartidosLocal(pronosticosCache); 
-}
-
-function getEstadoPartidoPorEst(partido) {
-    const est = Number(partido.est);
-    
-    switch(est) {
-        case 1:
-            return { 
-                estado: 'pulso100', 
-                clase: 'badge-pulso100', 
-                texto: 'PULSO 100',
-                icono: '🟢',
-                pulso: 100,
-                editable: true,
-                visible: true,
-                puntosBase: getPtsBase(partido.fas)
-            };
-        case 2:
-            return { 
-                estado: 'pulso50', 
-                clase: 'badge-pulso50', 
-                texto: 'PULSO 50',
-                icono: '🟡',
-                pulso: 50,
-                editable: true,
-                visible: true,
-                puntosBase: Math.round(getPtsBase(partido.fas) / 2)
-            };
-        case 3:
-            return { 
-                estado: 'entretiempo', 
-                clase: 'badge-entretiempo', 
-                texto: 'Entretiempo',
-                icono: '⏸️',
-                pulso: null,
-                editable: false,
-                visible: true,
-                puntosBase: 0
-            };
-        case 4:
-            return { 
-                estado: 'terminado', 
-                clase: 'badge-terminado', 
-                texto: 'Terminado',
-                icono: '🏁',
-                pulso: null,
-                editable: false,
-                visible: true,
-                puntosBase: getPtsBase(partido.fas)
-            };
-        default:
-            return { 
-                estado: 'desconocido', 
-                clase: 'badge-unknown', 
-                texto: 'Desconocido',
-                icono: '❓',
-                pulso: null,
-                editable: false,
-                visible: false,
-                puntosBase: 0
-            };
-    }
-}
-
-function getMarcadorEnVivo(partido) {
-    const est = Number(partido.est);
-    if (est === 2) {
-        return { tieneMarcador: false, texto: '🔴 PRIMER TIEMPO' };
-    }
-    if (est === 3) {
-        return { tieneMarcador: false, texto: '⏸️ ENTRETIEMPO' };
-    }
-    return null;
 }
 
 function getTipoFondo(fechaPartido, fechaSim) {
@@ -464,11 +354,7 @@ function renderTablaPosiciones(grupo) {
         if (!eq.pj || eq.pj === 0) {
             const partidosEquipo = partidosGrupo.filter(p => p.nom_loc === eq.name || p.nom_vis === eq.name);
             eq.pj = partidosEquipo.length;
-            eq.pg = 0;
-            eq.pe = 0;
-            eq.pp = 0;
-            eq.gf = 0;
-            eq.gc = 0;
+            eq.pg = 0; eq.pe = 0; eq.pp = 0; eq.gf = 0; eq.gc = 0;
             
             partidosEquipo.forEach(p => {
                 const resultado = getResultadoReal(p.id);
@@ -494,7 +380,7 @@ function renderTablaPosiciones(grupo) {
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
             <thead><tr style="background:#f2f2f7;">
                 <th>Pos</th><th>Equipo</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>DG</th><th>PTS</th>
-            </table></thead>
+            </tr></thead>
             <tbody>${
                 equiposGrupo.map((eq, idx) => {
                     const esClasificado1 = eq.name === clasificados[1];
@@ -523,37 +409,27 @@ function calcularCountdown(fechaPartido, horaPartido, fechaActual, horaActual) {
     const [year, month, day] = fechaPartido.split('-');
     const [hour, minute] = horaPartido.split(':');
     const fechaObjetivo = new Date(year, month - 1, day, hour, minute, 0);
-    
     const [actualYear, actualMonth, actualDay] = fechaActual.split('-');
     const [actualHour, actualMinute] = horaActual.split(':');
     const fechaActualDate = new Date(actualYear, actualMonth - 1, actualDay, actualHour, actualMinute, 0);
-    
     const diffMs = fechaObjetivo - fechaActualDate;
-    
     if (diffMs <= 0) return null;
-    
     const diffSegundos = Math.floor(diffMs / 1000);
     const dias = Math.floor(diffSegundos / 86400);
     const horas = Math.floor((diffSegundos % 86400) / 3600);
     const minutos = Math.floor((diffSegundos % 3600) / 60);
     const segundos = diffSegundos % 60;
-    
     return formatearCountdown(dias, horas, minutos, segundos);
 }
 
 function renderPartidoCard(partido, fechaSim, horaSim, tipoFondo, esPrimerDia = false) {
     const estadoEst = getEstadoPartidoPorEst(partido);
-    const esFuturo = (estadoEst.estado === 'pulso100' || estadoEst.estado === 'pulso50');
-    const ptsBase = estadoEst.puntosBase || getPtsBase(partido.fas);
+    const esFuturo = (estadoEst.estado === 'pendiente');
     let pronostico = pronosticosCache[partido.id];
-    
-    // Verificar si hay marcador temporal para este partido
     const temp = tempPronosticos.get(partido.id);
     if (temp && (Date.now() - temp.timestamp) < 30000) {
-        // Usar marcador temporal si es menor a 30 segundos
         pronostico = { s1: temp.s1, s2: temp.s2 };
     }
-    
     const resultadoReal = getResultadoReal(partido.id);
     const estilo = getFondoStyle(tipoFondo);
     const marcadorEnVivo = getMarcadorEnVivo(partido);
@@ -561,14 +437,10 @@ function renderPartidoCard(partido, fechaSim, horaSim, tipoFondo, esPrimerDia = 
     if (!estadoEst.visible) return '';
     
     let badgeHTML = '';
-    if (estadoEst.estado === 'pulso100') {
+    if (estadoEst.estado === 'terminado') {
         badgeHTML = `<div style="text-align:center; margin-bottom:10px;"><span style="background:rgba(52, 199, 89, 0.15); padding:4px 12px; border-radius:20px; color:#34c759; font-size:13px; font-weight:700;">${estadoEst.icono} ${estadoEst.texto}</span></div>`;
-    } else if (estadoEst.estado === 'pulso50') {
+    } else if (estadoEst.estado === 'envivo') {
         badgeHTML = `<div style="text-align:center; margin-bottom:10px;"><span style="background:rgba(255, 149, 0, 0.15); padding:4px 12px; border-radius:20px; color:#ff9500; font-size:13px; font-weight:700;">${estadoEst.icono} ${estadoEst.texto}</span></div>`;
-    } else if (estadoEst.estado === 'entretiempo') {
-        badgeHTML = `<div style="text-align:center; margin-bottom:10px;"><span style="background:rgba(142, 142, 147, 0.2); padding:4px 12px; border-radius:20px; color:#8e8e93; font-size:13px; font-weight:700;">${estadoEst.icono} ${estadoEst.texto}</span></div>`;
-    } else if (estadoEst.estado === 'terminado') {
-        badgeHTML = `<div style="text-align:center; margin-bottom:10px;"><span style="background:rgba(52, 199, 89, 0.15); padding:4px 12px; border-radius:20px; color:#34c759; font-size:13px; font-weight:700;">${estadoEst.icono} ${estadoEst.texto}</span></div>`;
     }
     
     const fechaFormateada = formatearFecha(partido.fch);
@@ -587,16 +459,16 @@ function renderPartidoCard(partido, fechaSim, horaSim, tipoFondo, esPrimerDia = 
     let centroHTML = '';
     if (resultadoReal && estadoEst.estado === 'terminado') {
         centroHTML = `<div style="font-size:20px; font-weight:700; color:#000;">${resultadoReal.gol_loc} - ${resultadoReal.gol_vis}</div>`;
-    } else if ((estadoEst.estado === 'pulso50' || estadoEst.estado === 'entretiempo') && marcadorEnVivo) {
+    } else if (estadoEst.estado === 'envivo' && marcadorEnVivo) {
         centroHTML = `<div style="font-size:14px; font-weight:700; color:#ff3b30;">${marcadorEnVivo.texto}</div>`;
-    } else if (estadoEst.estado === 'pulso100' || estadoEst.estado === 'pulso50') {
+    } else if (estadoEst.estado === 'pendiente') {
         centroHTML = '<div style="font-size:14px; font-weight:700; color:#007aff;">VS</div>';
     } else {
         centroHTML = '<div style="font-size:14px; font-weight:700; color:#8e8e93;">- - -</div>';
     }
     
     let countdownHTML = '';
-    if (esPrimerDia && estadoEst.estado === 'pulso100' && partido.fch && partido.hor) {
+    if (esPrimerDia && estadoEst.estado === 'pendiente' && partido.fch && partido.hor) {
         const fechaPartido = partido.fch.split('T')[0];
         const { fecha: fechaReal, hora: horaReal } = obtenerFechaReal();
         const countdownText = calcularCountdown(fechaPartido, partido.hor, fechaReal, horaReal);
@@ -693,9 +565,7 @@ function renderPartidoCard(partido, fechaSim, horaSim, tipoFondo, esPrimerDia = 
 function actualizarCountdowns() {
     const countdownElements = document.querySelectorAll('.partido-countdown');
     if (countdownElements.length === 0) return;
-    
     const { fecha: fechaReal, hora: horaReal } = obtenerFechaReal();
-    
     countdownElements.forEach(el => {
         const fechaPartido = el.dataset.fch;
         const horaPartido = el.dataset.hor;
@@ -711,82 +581,54 @@ function actualizarCountdowns() {
 }
 
 function iniciarCountdown() {
-    if (countdownInterval) {
-        clearInterval(countdownInterval);
-    }
-    countdownInterval = setInterval(() => {
-        if (!document.hidden) {
-            actualizarCountdowns();
-        }
-    }, 1000);
+    if (countdownInterval) clearInterval(countdownInterval);
+    countdownInterval = setInterval(() => { if (!document.hidden) actualizarCountdowns(); }, 1000);
     countdownActivo = true;
 }
 
 function detenerCountdown() {
-    if (countdownInterval) {
-        clearInterval(countdownInterval);
-        countdownInterval = null;
-    }
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
     countdownActivo = false;
 }
 
 function obtenerPrimerDiaConPartidos(partidos) {
     if (!partidos || partidos.length === 0) return null;
-    const fechas = [...new Set(partidos
-        .filter(p => Number(p.est) !== 0 && p.fch)
-        .map(p => p.fch.split('T')[0]))
-    ].sort();
+    const fechas = [...new Set(partidos.filter(p => Number(p.est) !== 0 && p.fch).map(p => p.fch.split('T')[0]))].sort();
     return fechas.length > 0 ? fechas[0] : null;
 }
 
 function scrollAPrimerDestacado() {
     if (tabActivo !== 'todos') return;
-    
     const contenedorScroll = document.getElementById('partidos-contenido-scroll');
     if (!contenedorScroll) return;
-    
     setTimeout(() => {
         const cards = document.querySelectorAll('.partido-card');
         if (cards.length === 0) return;
-        
         for (let i = 0; i < cards.length; i++) {
             const card = cards[i];
             const borderColor = window.getComputedStyle(card).borderColor;
             if (borderColor.includes('46, 204, 113') || borderColor.includes('46,204,113')) {
                 card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                console.log('[Scroll] Card VERDE (hoy)');
                 return;
             }
         }
-        
         for (let i = 0; i < cards.length; i++) {
             const card = cards[i];
             const borderColor = window.getComputedStyle(card).borderColor;
             if (borderColor.includes('230, 126, 34') || borderColor.includes('230,126,34')) {
                 card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                console.log('[Scroll] Card NARANJA (mañana)');
                 return;
             }
         }
-        
         contenedorScroll.scrollTo({ top: 0, behavior: 'smooth' });
-        console.log('[Scroll] Sin destacados, inicio');
-        
     }, 500);
 }
 
-// ========== FUNCIÓN GUARDAR PRONÓSTICO CORREGIDA ==========
 async function guardarPronostico(ptdId, s1, s2) {
-    if (!currentJugador) { 
-        mostrarToast('Inicia sesión primero', 'err'); 
-        return; 
-    }
-    
-    // Mostrar el marcador temporal INMEDIATAMENTE
+    if (!currentJugador) { mostrarToast('Inicia sesión primero', 'err'); return; }
     iniciarSincronizacionPeriodica(ptdId, s1, s2);
     actualizarCardPartido(ptdId, s1, s2);
     mostrarToast('💾 Guardando...', 'info');
-    
     try {
         const response = await fetch(`${BASE_V2}/_process/API_PUT_PAR?api_key=${KEY}`, {
             method: 'POST', headers: { 'Content-Type': 'text/plain' },
@@ -796,41 +638,23 @@ async function guardarPronostico(ptdId, s1, s2) {
             pronosticosCache[ptdId] = { s1, s2 };
             actualizarLocalStorage();
             mostrarToast('✅ Pronóstico guardado', 'ok');
-            
-            // Si es el partido inaugural (ID=1), volver a AHORA después de 1.5 segundos
             if (ptdId === 1 && globalCambiarVistaCallback) {
-                setTimeout(() => {
-                    console.log('[Partidos] Partido inaugural guardado, volviendo a AHORA');
-                    globalCambiarVistaCallback('ahora', currentJugador);
-                }, 1500);
+                setTimeout(() => { globalCambiarVistaCallback('ahora', currentJugador); }, 1500);
             }
-            
-            setTimeout(() => {
-                if (tempPronosticos.has(ptdId)) {
-                    sincronizarConVelneo(ptdId);
-                }
-            }, 2000);
-        }
-        else {
+            setTimeout(() => { if (tempPronosticos.has(ptdId)) sincronizarConVelneo(ptdId); }, 2000);
+        } else {
             mostrarToast('❌ Error al guardar', 'err');
             tempPronosticos.delete(ptdId);
-            if (syncIntervals.has(ptdId)) {
-                clearTimeout(syncIntervals.get(ptdId));
-                syncIntervals.delete(ptdId);
-            }
+            if (syncIntervals.has(ptdId)) { clearTimeout(syncIntervals.get(ptdId)); syncIntervals.delete(ptdId); }
         }
     } catch (error) { 
         console.error('Error al guardar:', error);
         mostrarToast('❌ Error de conexión', 'err');
         tempPronosticos.delete(ptdId);
-        if (syncIntervals.has(ptdId)) {
-            clearTimeout(syncIntervals.get(ptdId));
-            syncIntervals.delete(ptdId);
-        }
+        if (syncIntervals.has(ptdId)) { clearTimeout(syncIntervals.get(ptdId)); syncIntervals.delete(ptdId); }
     }
 }
 
-// Función para validar input numérico (solo números, min 0, max 20)
 function validarInputNumerico(input) {
     if (!input) return;
     input.addEventListener('input', (e) => {
@@ -842,54 +666,33 @@ function validarInputNumerico(input) {
     });
 }
 
-// ========== FUNCIÓN abrirModal CORREGIDA ==========
-// - Inputs tipo text con inputmode numeric para Android
-// - Gap reducido entre botones y inputs
-// - Validación de solo números
 function abrirModal(partido, fechaSim, horaSim) {
     const estadoEst = getEstadoPartidoPorEst(partido);
     const tienePronosticoPrevio = pronosticosCache[partido.id] !== undefined;
     let pronostico = pronosticosCache[partido.id] || { s1: 0, s2: 0 };
-    
-    // Verificar si hay marcador temporal
     const temp = tempPronosticos.get(partido.id);
-    if (temp && (Date.now() - temp.timestamp) < 30000) {
-        pronostico = { s1: temp.s1, s2: temp.s2 };
-    }
-    
+    if (temp && (Date.now() - temp.timestamp) < 30000) { pronostico = { s1: temp.s1, s2: temp.s2 }; }
     const ptsBase = estadoEst.puntosBase || getPtsBase(partido.fas);
     
     if (estadoEst.estado === 'terminado') {
         const resultadoReal = getResultadoReal(partido.id);
-        if (!resultadoReal) {
-            mostrarToast('Partido finalizado sin resultados disponibles', 'err');
-            return;
-        }
-        
+        if (!resultadoReal) { mostrarToast('Partido finalizado sin resultados disponibles', 'err'); return; }
         const pronosticoLocal = pronostico.s1;
         const pronosticoVisita = pronostico.s2;
         const realLocal = resultadoReal.gol_loc;
         const realVisita = resultadoReal.gol_vis;
-        
         let ganador = 0, golLocal = 0, golVisita = 0, diferencia = 0, inverso = 0;
         const ptsBaseOriginal = getPtsBase(partido.fas);
         const p = { GANADOR: Math.round(ptsBaseOriginal * 0.4), GOL: Math.round(ptsBaseOriginal * 0.2), DIFERENCIA: Math.round(ptsBaseOriginal * 0.2), INVERSO: Math.round(ptsBaseOriginal * 0.2) };
-        
         const pronosticoGanador = pronosticoLocal > pronosticoVisita ? 'local' : (pronosticoVisita > pronosticoLocal ? 'visita' : 'empate');
         const realGanador = realLocal > realVisita ? 'local' : (realVisita > realLocal ? 'visita' : 'empate');
-        
         if (pronosticoGanador === realGanador) ganador = p.GANADOR;
         if (realLocal === pronosticoLocal) golLocal = p.GOL;
         if (realVisita === pronosticoVisita) golVisita = p.GOL;
-        
         const pronosticoDiferencia = Math.abs(pronosticoLocal - pronosticoVisita);
         const realDiferencia = Math.abs(realLocal - realVisita);
         if (pronosticoDiferencia === realDiferencia) diferencia = p.DIFERENCIA;
-        
-        if (pronosticoGanador !== realGanador) {
-            if (realLocal === pronosticoVisita && realVisita === pronosticoLocal) inverso = p.INVERSO;
-        }
-        
+        if (pronosticoGanador !== realGanador && realLocal === pronosticoVisita && realVisita === pronosticoLocal) inverso = p.INVERSO;
         const total = ganador + golLocal + golVisita + diferencia + inverso;
         
         const overlay = document.createElement('div');
@@ -897,41 +700,22 @@ function abrirModal(partido, fechaSim, horaSim) {
         overlay.innerHTML = `<div style="background:#fff;border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:480px;">
             <div style="display:flex;justify-content:space-between;margin-bottom:16px;"><div style="font-size:17px;font-weight:700;">${partido.grp_for||'Fase '+partido.fas}</div><button id="cerrar-modal-btn" style="background:none;border:none;font-size:22px;">✕</button></div>
             <div style="font-size:12px;color:#8e8e93;margin-bottom:20px;text-align:center;">${formatearFecha(partido.fch)} · ${formatearHora12h(partido.hor)}</div>
-            
             <div style="background:#f2f2f7;border-radius:14px;padding:16px;margin-bottom:16px;">
                 <div style="font-size:12px;color:#8e8e93;margin-bottom:12px;text-align:center;">TU PRONÓSTICO</div>
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <div style="text-align:center; flex:1;">
-                        <div style="font-size:40px; margin-bottom:4px;">${getBandera(partido.nom_loc)}</div>
-                        <div style="font-size:12px;font-weight:600;">${partido.nom_loc}</div>
-                        <div style="font-size:24px;font-weight:800;color:#007aff;margin-top:8px;">${pronosticoLocal}</div>
-                    </div>
+                    <div style="text-align:center; flex:1;"><div style="font-size:40px; margin-bottom:4px;">${getBandera(partido.nom_loc)}</div><div style="font-size:12px;font-weight:600;">${partido.nom_loc}</div><div style="font-size:24px;font-weight:800;color:#007aff;margin-top:8px;">${pronosticoLocal}</div></div>
                     <div style="font-size:20px; font-weight:700; color:#8e8e93;">VS</div>
-                    <div style="text-align:center; flex:1;">
-                        <div style="font-size:40px; margin-bottom:4px;">${getBandera(partido.nom_vis)}</div>
-                        <div style="font-size:12px;font-weight:600;">${partido.nom_vis}</div>
-                        <div style="font-size:24px;font-weight:800;color:#007aff;margin-top:8px;">${pronosticoVisita}</div>
-                    </div>
+                    <div style="text-align:center; flex:1;"><div style="font-size:40px; margin-bottom:4px;">${getBandera(partido.nom_vis)}</div><div style="font-size:12px;font-weight:600;">${partido.nom_vis}</div><div style="font-size:24px;font-weight:800;color:#007aff;margin-top:8px;">${pronosticoVisita}</div></div>
                 </div>
             </div>
-            
             <div style="background:#f9f9fb;border-radius:14px;padding:16px;margin-bottom:16px;">
                 <div style="font-size:12px;color:#8e8e93;margin-bottom:12px;text-align:center;">RESULTADO REAL</div>
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <div style="text-align:center; flex:1;">
-                        <div style="font-size:40px; margin-bottom:4px;">${getBandera(partido.nom_loc)}</div>
-                        <div style="font-size:12px;font-weight:600;">${partido.nom_loc}</div>
-                        <div style="font-size:24px;font-weight:800;color:#34c759;margin-top:8px;">${realLocal}</div>
-                    </div>
+                    <div style="text-align:center; flex:1;"><div style="font-size:40px; margin-bottom:4px;">${getBandera(partido.nom_loc)}</div><div style="font-size:12px;font-weight:600;">${partido.nom_loc}</div><div style="font-size:24px;font-weight:800;color:#34c759;margin-top:8px;">${realLocal}</div></div>
                     <div style="font-size:20px; font-weight:700; color:#8e8e93;">VS</div>
-                    <div style="text-align:center; flex:1;">
-                        <div style="font-size:40px; margin-bottom:4px;">${getBandera(partido.nom_vis)}</div>
-                        <div style="font-size:12px;font-weight:600;">${partido.nom_vis}</div>
-                        <div style="font-size:24px;font-weight:800;color:#34c759;margin-top:8px;">${realVisita}</div>
-                    </div>
+                    <div style="text-align:center; flex:1;"><div style="font-size:40px; margin-bottom:4px;">${getBandera(partido.nom_vis)}</div><div style="font-size:12px;font-weight:600;">${partido.nom_vis}</div><div style="font-size:24px;font-weight:800;color:#34c759;margin-top:8px;">${realVisita}</div></div>
                 </div>
             </div>
-            
             <div style="background:#f2f2f7;border-radius:12px;padding:12px;margin-bottom:16px;">
                 <div style="font-size:11px;font-weight:700;margin-bottom:8px;">📊 TU PUNTUACIÓN</div>
                 <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span>🏆 Ganador / Empate</span><span style="color:${ganador>0?'#34c759':'#ff3b30'}">${ganador} pts</span></div>
@@ -951,8 +735,8 @@ function abrirModal(partido, fechaSim, horaSim) {
         return;
     }
     
-    if (estadoEst.estado === 'entretiempo') {
-        mostrarToast('⏸️ El partido está en entretiempo. No se aceptan más pronósticos.', 'err');
+    if (estadoEst.estado === 'envivo') {
+        mostrarToast('🔴 Partido EN VIVO. No se aceptan más pronósticos.', 'err');
         return;
     }
     
@@ -961,17 +745,10 @@ function abrirModal(partido, fechaSim, horaSim) {
         return;
     }
     
-    if (estadoEst.estado === 'pulso50' && tienePronosticoPrevio) {
-        mostrarToast('🔒 Ya tienes un pronóstico para este partido. En PULSO 50 no se puede modificar.', 'err');
-        return;
-    }
-    
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:3000;display:flex;align-items:flex-end;justify-content:center;';
     
-    const mensajePulso = estadoEst.estado === 'pulso100' 
-        ? `${estadoEst.icono} PULSO 100 · Si aciertas el marcador exacto tendrás ${ptsBase} puntos.`
-        : `${estadoEst.icono} PULSO 50 · Si aciertas el marcador exacto tendrás ${ptsBase} puntos.`;
+    const mensajePulso = `🟢 PULSO 100 · Si aciertas el marcador exacto tendrás ${ptsBase} puntos.`;
     
     overlay.innerHTML = `<div style="background:#fff;border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:480px;">
         <div style="display:flex;justify-content:space-between;margin-bottom:16px;">
@@ -980,7 +757,6 @@ function abrirModal(partido, fechaSim, horaSim) {
         </div>
         <div style="font-size:12px;color:#8e8e93;margin-bottom:20px;text-align:center;">${formatearFecha(partido.fch)} · ${formatearHora12h(partido.hor)}</div>
         
-        <!-- SECCIÓN CON FONDO DE ESTADIO (CSS PURO) -->
         <div style="background: linear-gradient(135deg, #0a2f1f 0%, #1a5a3a 100%); border-radius: 20px; padding: 16px; margin-bottom: 20px; position: relative; overflow: hidden;">
             <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: repeating-linear-gradient(90deg, rgba(0,0,0,0.1) 0px, rgba(0,0,0,0.1) 2px, transparent 2px, transparent 20px); pointer-events: none;"></div>
             <div style="position: absolute; top: 0; left: 0; width: 100%; height: 20%; background: linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%); pointer-events: none;"></div>
@@ -989,19 +765,12 @@ function abrirModal(partido, fechaSim, horaSim) {
             <div style="position: absolute; top: 0; left: 50%; width: 2px; height: 100%; background: rgba(255,255,255,0.15); transform: translateX(-50%); pointer-events: none;"></div>
             <div style="position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: rgba(255,255,255,0.3); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none;"></div>
             <div style="position: relative; z-index: 10; display:flex; justify-content:space-between; align-items:center;">
-                <div style="text-align:center; flex:1;">
-                    <div style="font-size:56px; margin-bottom:8px;">${getBandera(partido.nom_loc)}</div>
-                    <div style="font-size:15px; font-weight:700; color:white; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${partido.nom_loc}</div>
-                </div>
+                <div style="text-align:center; flex:1;"><div style="font-size:56px; margin-bottom:8px;">${getBandera(partido.nom_loc)}</div><div style="font-size:15px; font-weight:700; color:white; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${partido.nom_loc}</div></div>
                 <div style="font-size:18px; font-weight:700; color:white; text-shadow: 0 1px 2px rgba(0,0,0,0.5); padding:0 20px;">VS</div>
-                <div style="text-align:center; flex:1;">
-                    <div style="font-size:56px; margin-bottom:8px;">${getBandera(partido.nom_vis)}</div>
-                    <div style="font-size:15px; font-weight:700; color:white; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${partido.nom_vis}</div>
-                </div>
+                <div style="text-align:center; flex:1;"><div style="font-size:56px; margin-bottom:8px;">${getBandera(partido.nom_vis)}</div><div style="font-size:15px; font-weight:700; color:white; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${partido.nom_vis}</div></div>
             </div>
         </div>
         
-        <!-- CONTROLES DE GOLES CORREGIDOS PARA ANDROID -->
         <div style="display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:24px;">
             <div style="flex:1; text-align:center;">
                 <div style="display:flex; align-items:center; justify-content:center; gap:8px; background:#f9f9fb; border-radius:30px; padding:6px 10px;">
@@ -1021,27 +790,12 @@ function abrirModal(partido, fechaSim, horaSim) {
         
         <div style="background:#f2f2f7;border-radius:12px;padding:12px;margin-bottom:16px;">
             <div style="font-size:14px;font-weight:700;margin-bottom:12px;">📋 Detalle de puntos</div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-                <span>🏆 Ganador / Empate</span>
-                <span style="color:#34c759;font-weight:700;">${Math.round(ptsBase * 0.4)} pts</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-                <span>⚽ Gol local exacto</span>
-                <span style="color:#34c759;font-weight:700;">${Math.round(ptsBase * 0.2)} pts</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-                <span>⚽ Gol visita exacto</span>
-                <span style="color:#34c759;font-weight:700;">${Math.round(ptsBase * 0.2)} pts</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-                <span>📊 Diferencia de goles</span>
-                <span style="color:#34c759;font-weight:700;">${Math.round(ptsBase * 0.2)} pts</span>
-            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>🏆 Ganador / Empate</span><span style="color:#34c759;font-weight:700;">${Math.round(ptsBase * 0.4)} pts</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>⚽ Gol local exacto</span><span style="color:#34c759;font-weight:700;">${Math.round(ptsBase * 0.2)} pts</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>⚽ Gol visita exacto</span><span style="color:#34c759;font-weight:700;">${Math.round(ptsBase * 0.2)} pts</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>📊 Diferencia de goles</span><span style="color:#34c759;font-weight:700;">${Math.round(ptsBase * 0.2)} pts</span></div>
             <div style="height:1px;background:#e5e5ea;margin:8px 0;"></div>
-            <div style="display:flex;justify-content:space-between;">
-                <span style="font-weight:700;">⭐ BASE</span>
-                <span style="color:#ff9500;font-weight:800;">${ptsBase} pts</span>
-            </div>
+            <div style="display:flex;justify-content:space-between;"><span style="font-weight:700;">⭐ BASE</span><span style="color:#ff9500;font-weight:800;">${ptsBase} pts</span></div>
         </div>
         
         <div style="background:#eafaf1;border-radius:12px;padding:12px;margin-bottom:16px;text-align:center;">
@@ -1058,43 +812,14 @@ function abrirModal(partido, fechaSim, horaSim) {
     const s2Input = document.getElementById('modal-s2');
     const guardarBtn = document.getElementById('modal-guardar-btn');
     
-    // Validar inputs (solo números)
+    document.getElementById('modal-inc-loc')?.addEventListener('click', () => { if (s1Input) s1Input.value = Math.min(20, parseInt(s1Input.value||0)+1); });
+    document.getElementById('modal-dec-loc')?.addEventListener('click', () => { if (s1Input) s1Input.value = Math.max(0, parseInt(s1Input.value||0)-1); });
+    document.getElementById('modal-inc-vis')?.addEventListener('click', () => { if (s2Input) s2Input.value = Math.min(20, parseInt(s2Input.value||0)+1); });
+    document.getElementById('modal-dec-vis')?.addEventListener('click', () => { if (s2Input) s2Input.value = Math.max(0, parseInt(s2Input.value||0)-1); });
+    
     validarInputNumerico(s1Input);
     validarInputNumerico(s2Input);
     
-    // Botones incremento/decremento para LOCAL
-    document.getElementById('modal-inc-loc')?.addEventListener('click', () => { 
-        if (s1Input) {
-            let val = parseInt(s1Input.value) || 0;
-            val = Math.min(20, val + 1);
-            s1Input.value = val;
-        }
-    });
-    document.getElementById('modal-dec-loc')?.addEventListener('click', () => { 
-        if (s1Input) {
-            let val = parseInt(s1Input.value) || 0;
-            val = Math.max(0, val - 1);
-            s1Input.value = val;
-        }
-    });
-    
-    // Botones incremento/decremento para VISITANTE
-    document.getElementById('modal-inc-vis')?.addEventListener('click', () => { 
-        if (s2Input) {
-            let val = parseInt(s2Input.value) || 0;
-            val = Math.min(20, val + 1);
-            s2Input.value = val;
-        }
-    });
-    document.getElementById('modal-dec-vis')?.addEventListener('click', () => { 
-        if (s2Input) {
-            let val = parseInt(s2Input.value) || 0;
-            val = Math.max(0, val - 1);
-            s2Input.value = val;
-        }
-    });
-    
-    // Botón guardar
     if (guardarBtn) {
         guardarBtn.onclick = () => { 
             const s1 = parseInt(s1Input?.value) || 0; 
@@ -1110,126 +835,76 @@ function abrirModal(partido, fechaSim, horaSim) {
 async function refrescarDatosPartidos() {
     console.log('🔄 Refrescando datos de partidos...');
     mostrarToast('⟳ Actualizando partidos...', 'info');
-    
     await cargarEquipos();
     await cargarPartidos();
     await cargarPronosticos(currentJugador?.id);
     refrescarContenido();
-    
     mostrarToast('✅ Partidos actualizados', 'ok');
 }
 
-// ========== FUNCIÓN REFRESCAR CONTENIDO CORREGIDA ==========
 async function refrescarContenido() {
     const contenedorScroll = document.getElementById('partidos-contenido-scroll');
     if (!contenedorScroll) return;
-    
-    if (currentJugador) {
-        await cargarPronosticos(currentJugador.id, false);
-    }
+    if (currentJugador) { await cargarPronosticos(currentJugador.id, false); }
     
     const fechaSim = simGetFechaStr ? simGetFechaStr() : new Date().toISOString().split('T')[0];
     const horaSim = simGetHoraStr ? simGetHoraStr() : new Date().toTimeString().split(' ')[0].substring(0,5);
     
-    const partidosVisibles = partidosCache.filter(p => {
-        const est = Number(p.est);
-        return est >= 1 && est <= 4 && p.fas === 1;
-    });
-    
+    const partidosVisibles = partidosCache.filter(p => { const est = Number(p.est); return est >= 1 && est <= 4 && p.fas === 1; });
     const primerDia = obtenerPrimerDiaConPartidos(partidosVisibles);
     
     if (tabActivo === 'todos') {
+        contenedorScroll.innerHTML = `<div style="padding:16px;"><div id="partidos-lista">${partidosVisibles.map(p => {
+            const fechaPartido = p.fch ? p.fch.split('T')[0] : '';
+            const tipo = getTipoFondo(fechaPartido, fechaSim);
+            const esPrimerDia = (fechaPartido === primerDia);
+            return renderPartidoCard(p, fechaSim, horaSim, tipo, esPrimerDia);
+        }).join('')}</div></div>`;
+    } else if (tabActivo === 'grupos') {
+        const partidosGrupo = partidosVisibles.filter(p => p.grupoCalculado === grupoActivo);
+        const botonesGrupos = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'].map(g => {
+            let label = g; if (g === 'K') label = 'K🇨🇴';
+            return `<button class="grupo-tab ${grupoActivo === g ? 'active' : ''}" data-grupo="${g}" style="width:48px;height:48px;border-radius:24px;background:${grupoActivo === g ? '#007aff' : '#f2f2f7'};border:1px solid ${grupoActivo === g ? '#007aff' : '#e5e5ea'};color:${grupoActivo === g ? '#fff' : '#3c3c43'};cursor:pointer;font-weight:700;">${label}</button>`;
+        }).join('');
         contenedorScroll.innerHTML = `<div style="padding:16px;">
-            <div id="partidos-lista">${partidosVisibles.map(p => {
+            <div class="grupos-tabs" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;justify-content:center;">${botonesGrupos}</div>
+            <div style="background:#f9f9fb;border-radius:14px;border:1px solid #e5e5ea;margin-bottom:20px;overflow-x:auto;">${renderTablaPosiciones(grupoActivo)}</div>
+            <div id="partidos-lista" style="margin-top:16px;">${partidosGrupo.length > 0 ? partidosGrupo.map(p => {
                 const fechaPartido = p.fch ? p.fch.split('T')[0] : '';
                 const tipo = getTipoFondo(fechaPartido, fechaSim);
                 const esPrimerDia = (fechaPartido === primerDia);
                 return renderPartidoCard(p, fechaSim, horaSim, tipo, esPrimerDia);
-            }).join('')}</div>
+            }).join('') : '<div style="text-align:center;padding:40px;color:#8e8e93;">No hay partidos programados para este grupo</div>'}</div>
         </div>`;
-    } else if (tabActivo === 'grupos') {
-        const partidosGrupo = partidosVisibles.filter(p => p.grupoCalculado === grupoActivo);
-        
-        const botonesGrupos = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'].map(g => {
-            let label = g;
-            if (g === 'K') label = 'K🇨🇴';
-            return `<button class="grupo-tab ${grupoActivo === g ? 'active' : ''}" data-grupo="${g}" style="width:48px;height:48px;border-radius:24px;background:${grupoActivo === g ? '#007aff' : '#f2f2f7'};border:1px solid ${grupoActivo === g ? '#007aff' : '#e5e5ea'};color:${grupoActivo === g ? '#fff' : '#3c3c43'};cursor:pointer;font-weight:700;">${label}</button>`;
-        }).join('');
-        
-        contenedorScroll.innerHTML = `<div style="padding:16px;">
-            <div class="grupos-tabs" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;justify-content:center;">
-                ${botonesGrupos}
-            </div>
-            <div style="background:#f9f9fb;border-radius:14px;border:1px solid #e5e5ea;margin-bottom:20px;overflow-x:auto;">
-                ${renderTablaPosiciones(grupoActivo)}
-            </div>
-            <div id="partidos-lista" style="margin-top:16px;">
-                ${partidosGrupo.length > 0 ? partidosGrupo.map(p => {
-                    const fechaPartido = p.fch ? p.fch.split('T')[0] : '';
-                    const tipo = getTipoFondo(fechaPartido, fechaSim);
-                    const esPrimerDia = (fechaPartido === primerDia);
-                    return renderPartidoCard(p, fechaSim, horaSim, tipo, esPrimerDia);
-                }).join('') : '<div style="text-align:center;padding:40px;color:#8e8e93;">No hay partidos programados para este grupo</div>'}
-            </div>
-        </div>`;
-        
-        document.querySelectorAll('.grupo-tab').forEach(btn => {
-            btn.onclick = () => {
-                grupoActivo = btn.dataset.grupo;
-                refrescarContenido();
-            };
-        });
+        document.querySelectorAll('.grupo-tab').forEach(btn => { btn.onclick = () => { grupoActivo = btn.dataset.grupo; refrescarContenido(); }; });
     } else if (tabActivo === 'colombia') {
-        const partidosColombia = partidosVisibles.filter(p => 
-            (p.nom_loc === 'Colombia' || p.nom_vis === 'Colombia')
-        );
-        
-        console.log(`[Colombia] Partidos encontrados: ${partidosColombia.length}`);
-        
+        const partidosColombia = partidosVisibles.filter(p => (p.nom_loc === 'Colombia' || p.nom_vis === 'Colombia'));
         contenedorScroll.innerHTML = `<div style="padding:16px;">
-            <div style="margin-bottom:16px;">
-                <h3 style="color:#1c1c1e; font-size:16px; margin:0;">🇨🇴 Partidos de Colombia</h3>
-            </div>
-            <div id="partidos-lista" style="margin-top:16px;">
-                ${partidosColombia.length > 0 ? partidosColombia.map(p => {
-                    const fechaPartido = p.fch ? p.fch.split('T')[0] : '';
-                    const tipo = getTipoFondo(fechaPartido, fechaSim);
-                    const esPrimerDia = (fechaPartido === primerDia);
-                    return renderPartidoCard(p, fechaSim, horaSim, tipo, esPrimerDia);
-                }).join('') : '<div style="text-align:center;padding:40px;color:#8e8e93;">No hay partidos programados para Colombia</div>'}
-            </div>
+            <div style="margin-bottom:16px;"><h3 style="color:#1c1c1e; font-size:16px; margin:0;">🇨🇴 Partidos de Colombia</h3></div>
+            <div id="partidos-lista" style="margin-top:16px;">${partidosColombia.length > 0 ? partidosColombia.map(p => {
+                const fechaPartido = p.fch ? p.fch.split('T')[0] : '';
+                const tipo = getTipoFondo(fechaPartido, fechaSim);
+                const esPrimerDia = (fechaPartido === primerDia);
+                return renderPartidoCard(p, fechaSim, horaSim, tipo, esPrimerDia);
+            }).join('') : '<div style="text-align:center;padding:40px;color:#8e8e93;">No hay partidos programados para Colombia</div>'}</div>
         </div>`;
     }
     
     document.querySelectorAll('.partido-card').forEach(card => {
         const id = parseInt(card.dataset.id);
         const partido = partidosCache.find(p => p.id === id);
-        if (partido) {
-            card.onclick = () => abrirModal(partido, fechaSim, horaSim);
-        }
+        if (partido) { card.onclick = () => abrirModal(partido, fechaSim, horaSim); }
     });
     
     scrollAPrimerDestacado();
-    
-    if (document.querySelectorAll('.partido-countdown').length > 0) {
-        if (!countdownActivo) {
-            iniciarCountdown();
-        }
-    }
+    if (document.querySelectorAll('.partido-countdown').length > 0 && !countdownActivo) { iniciarCountdown(); }
 }
 
 function cambiarTab(tab) { 
     tabActivo = tab; 
     document.querySelectorAll('.partidos-tab').forEach(t => { 
-        if (t.dataset.tab === tab) { 
-            t.classList.add('active'); 
-            t.style.background = '#007aff'; 
-            t.style.color = '#fff'; 
-        } else { 
-            t.classList.remove('active'); 
-            t.style.background = '#f2f2f7'; 
-            t.style.color = '#3c3c43'; 
-        } 
+        if (t.dataset.tab === tab) { t.classList.add('active'); t.style.background = '#007aff'; t.style.color = '#fff'; } 
+        else { t.classList.remove('active'); t.style.background = '#f2f2f7'; t.style.color = '#3c3c43'; } 
     }); 
     refrescarContenido(); 
 }
@@ -1237,13 +912,9 @@ function cambiarTab(tab) {
 export async function renderizarPartidos(contenedor, datosCuenta) {
     if (!contenedor) return;
     currentJugador = datosCuenta;
-    
     detenerCountdown();
-    
     tempPronosticos.clear();
-    for (const [ptdId, timeout] of syncIntervals) {
-        clearTimeout(timeout);
-    }
+    for (const [ptdId, timeout] of syncIntervals) { clearTimeout(timeout); }
     syncIntervals.clear();
     
     await cargarEquipos();
@@ -1268,11 +939,7 @@ export async function renderizarPartidos(contenedor, datosCuenta) {
     refrescarContenido();
     
     document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-            detenerCountdown();
-        } else if (document.querySelectorAll('.partido-countdown').length > 0) {
-            iniciarCountdown();
-            actualizarCountdowns();
-        }
+        if (document.hidden) { detenerCountdown(); } 
+        else if (document.querySelectorAll('.partido-countdown').length > 0) { iniciarCountdown(); actualizarCountdowns(); }
     });
 }
