@@ -1,9 +1,9 @@
 // funciones/ahora.js
-// Pantalla "AHORA" - VERSIÓN CON CARD DE PARTIDOS REDUCIDA
-// - Card 1: Partidos del día (solo banderas, nombres, marcadores)
+// Pantalla "AHORA" - VERSIÓN CON CARD DE PARTIDOS COMPACTA Y CENTRADA
+// - Card 1: Partidos del día (compacto, centrado, sin desbordamiento)
 // - Card 2: Finalistas (Ciclo 2) - badge PULSO solo si NO ha hecho pronóstico
 // - Card 3: Reglas del juego
-// - Badges en Card 1: EN VIVO (único) y TERMINADO
+// - Badges: EN VIVO (🔴 EN VIVO) y TERMINADO (🏁 FIN)
 
 import { simGetFechaStr, simGetHoraStr, onSimuladorCambio } from './lab.js';
 import { gruposSeleccion, finalistasSeleccion } from './especiales.js';
@@ -52,7 +52,7 @@ function formatearHora12h(horaStr) {
     const periodo = horaNum >= 12 ? 'pm' : 'am';
     if (horaNum > 12) horaNum -= 12;
     if (horaNum === 0) horaNum = 12;
-    return `${horaNum}:${minuto} ${periodo}`;
+    return `${horaNum}:${minuto}`;
 }
 
 async function cargarPartidos() {
@@ -128,33 +128,13 @@ function tieneAlgunFinalista() {
 function getEstadoPartido(partido) {
     const est = Number(partido.est);
     
-    // TERMINADO
     if (est === 4) {
-        return { 
-            estado: 'terminado', 
-            texto: 'TERMINADO',
-            icono: '🏁',
-            clase: 'badge-terminado'
-        };
+        return { estado: 'terminado', texto: 'FIN', icono: '🏁' };
     }
-    
-    // EN VIVO (est = 2 o 3)
     if (est === 2 || est === 3) {
-        return { 
-            estado: 'envivo', 
-            texto: 'EN VIVO',
-            icono: '🟡',
-            clase: 'badge-envivo'
-        };
+        return { estado: 'envivo', texto: 'EN VIVO', icono: '🔴' };
     }
-    
-    // ANTES DEL PARTIDO (est = 1 o cualquier otro)
-    return { 
-        estado: 'pendiente', 
-        texto: '',
-        icono: '',
-        clase: ''
-    };
+    return { estado: 'pendiente', texto: '', icono: '' };
 }
 
 function getResultadoReal(partidoId) { 
@@ -181,9 +161,9 @@ function renderizarPartidosDelDia() {
     
     if (partidosDelDia.length === 0) {
         return `
-            <div style="text-align: center; padding: 16px; color: #8e8e93;">
-                <div style="font-size: 20px; margin-bottom: 4px;">📅</div>
-                <div style="font-size: 12px;">No hay partidos hoy</div>
+            <div style="text-align: center; padding: 12px; color: #8e8e93;">
+                <div style="font-size: 16px; margin-bottom: 2px;">📅</div>
+                <div style="font-size: 11px;">No hay partidos hoy</div>
             </div>
         `;
     }
@@ -192,61 +172,70 @@ function renderizarPartidosDelDia() {
     
     partidosDelDia.forEach(partido => {
         const estado = getEstadoPartido(partido);
-        const pronostico = pronosticosCache[partido.id];
         const resultadoReal = getResultadoReal(partido.id);
         
-        let marcadorHtml = '';
+        // Formatear fecha compacta
+        const fechaObj = new Date(partido.fch);
+        const diasSemana = { 0: 'Dom', 1: 'Lun', 2: 'Mar', 3: 'Mié', 4: 'Jue', 5: 'Vie', 6: 'Sáb' };
+        const meses = { 0: 'Ene', 1: 'Feb', 2: 'Mar', 3: 'Abr', 4: 'May', 5: 'Jun', 6: 'Jul', 7: 'Ago', 8: 'Sep', 9: 'Oct', 10: 'Nov', 11: 'Dic' };
+        const diaSemana = diasSemana[fechaObj.getDay()];
+        const dia = fechaObj.getDate();
+        const mes = meses[fechaObj.getMonth()];
+        const horaFormateada = partido.hor ? formatearHora12h(partido.hor) : '';
+        
+        const grupoDisplay = partido.grp_for || `Grupo ${partido.grupoCalculado || '?'}`;
+        
+        let centroHtml = '';
+        let borderColor = '#007aff';
         
         if (estado.estado === 'terminado' && resultadoReal) {
-            // Partido terminado: mostrar resultado real con badge TERMINADO
-            marcadorHtml = `
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-weight: 600; color: #1c1c1e;">${resultadoReal.gol_loc}</span>
-                    <span style="color: #8e8e93;">-</span>
-                    <span style="font-weight: 600; color: #1c1c1e;">${resultadoReal.gol_vis}</span>
-                    <span style="background: #34c75920; color: #34c759; padding: 2px 6px; border-radius: 10px; font-size: 9px; font-weight: 600;">🏁 TERMINADO</span>
+            borderColor = '#34c759';
+            centroHtml = `
+                <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                    <span style="font-size: 14px; font-weight: 700; color: #1c1c1e;">${resultadoReal.gol_loc}</span>
+                    <span style="font-size: 11px; color: #8e8e93;">-</span>
+                    <span style="font-size: 14px; font-weight: 700; color: #1c1c1e;">${resultadoReal.gol_vis}</span>
+                    <span style="background: #34c75920; color: #34c759; padding: 2px 5px; border-radius: 8px; font-size: 8px; font-weight: 600;">${estado.texto}</span>
                 </div>
             `;
         } else if (estado.estado === 'envivo') {
-            // Partido EN VIVO: solo un badge (sin duplicar)
-            marcadorHtml = `
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="color: #ff9500; font-size: 11px; font-weight: 500;">🔴</span>
-                    <span style="background: #ff950020; color: #ff9500; padding: 2px 6px; border-radius: 10px; font-size: 9px; font-weight: 600;">EN VIVO</span>
-                </div>
-            `;
-        } else if (pronostico) {
-            // Partido no iniciado con pronóstico
-            marcadorHtml = `
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-weight: 500; color: #007aff;">${pronostico.s1}</span>
-                    <span style="color: #8e8e93;">-</span>
-                    <span style="font-weight: 500; color: #007aff;">${pronostico.s2}</span>
+            borderColor = '#ff3b30';
+            centroHtml = `
+                <div style="display: flex; align-items: center; justify-content: center; gap: 3px;">
+                    <span style="color: #ff3b30; font-size: 10px;">${estado.icono}</span>
+                    <span style="color: #ff3b30; font-size: 10px; font-weight: 600;">${estado.texto}</span>
                 </div>
             `;
         } else {
-            // Partido no iniciado sin pronóstico
-            marcadorHtml = `
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="color: #8e8e93;">?</span>
-                    <span style="color: #c7c7cc;">-</span>
-                    <span style="color: #8e8e93;">?</span>
+            borderColor = '#007aff';
+            centroHtml = `
+                <div style="display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 12px; font-weight: 700; color: #007aff;">VS</span>
                 </div>
             `;
         }
         
         html += `
-            <div style="display: flex; align-items: center; justify-content: space-between; background: #f9f9fb; border-radius: 12px; padding: 8px 12px;">
-                <div style="display: flex; align-items: center; gap: 10px; flex: 2;">
-                    <span style="font-size: 24px;">${getBandera(partido.nom_loc)}</span>
-                    <span style="font-size: 12px; font-weight: 500; color: #1c1c1e; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${partido.nom_loc}</span>
+            <div style="background: #f9f9fb; border-radius: 12px; padding: 8px 10px; border-left: 3px solid ${borderColor};">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span style="font-size: 9px; font-weight: 600; color: #8e8e93;">${grupoDisplay}</span>
+                    <span style="font-size: 9px; color: #8e8e93;">${diaSemana} ${dia} ${mes} · ${horaFormateada}</span>
                 </div>
-                <div style="flex: 1; text-align: center;">
-                    ${marcadorHtml}
-                </div>
-                <div style="display: flex; align-items: center; gap: 10px; flex: 2; justify-content: flex-end;">
-                    <span style="font-size: 12px; font-weight: 500; color: #1c1c1e; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right;">${partido.nom_vis}</span>
-                    <span style="font-size: 24px;">${getBandera(partido.nom_vis)}</span>
+                
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; min-width: 0;">
+                        <span style="font-size: 28px;">${getBandera(partido.nom_loc)}</span>
+                        <span style="font-size: 10px; font-weight: 500; color: #1c1c1e; text-align: center; word-break: break-word; max-width: 80px; line-height: 1.2;">${partido.nom_loc}</span>
+                    </div>
+                    
+                    <div style="flex-shrink: 0; min-width: 65px; text-align: center;">
+                        ${centroHtml}
+                    </div>
+                    
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; min-width: 0;">
+                        <span style="font-size: 28px;">${getBandera(partido.nom_vis)}</span>
+                        <span style="font-size: 10px; font-weight: 500; color: #1c1c1e; text-align: center; word-break: break-word; max-width: 80px; line-height: 1.2;">${partido.nom_vis}</span>
+                    </div>
                 </div>
             </div>
         `;
@@ -263,11 +252,9 @@ function getBadgeCiclo2() {
     if (ciclo2Completo) {
         return '<div class="ahora-card-badge completado">✅ COMPLETADO</div>';
     }
-    
     if (tieneAlguno) {
         return '<div class="ahora-card-badge pendiente">⚠️ INCOMPLETO</div>';
     }
-    
     return '<div class="ahora-card-badge pulso50">🟡 PULSO 50</div>';
 }
 
@@ -286,61 +273,33 @@ async function renderizarAhoraContent() {
                     text-align: center; 
                     color: white;
                     border-radius: 20px 20px 0 0;
-                    position: relative;
-                    overflow: hidden;
                 }
-                
-                .ahora-header::before {
-                    content: '';
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    background: repeating-linear-gradient(90deg, rgba(0,0,0,0.1) 0px, rgba(0,0,0,0.1) 2px, transparent 2px, transparent 20px);
-                    pointer-events: none;
-                }
-                
                 .ahora-header h2 { 
                     font-size: 18px; 
                     font-weight: 700; 
                     margin: 0 0 4px 0; 
-                    color: white; 
-                    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-                    position: relative;
-                    z-index: 5;
                 }
-                
                 .ahora-header p { 
                     font-size: 12px; 
                     opacity: 0.95; 
                     margin: 0;
-                    position: relative;
-                    z-index: 5;
-                    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
                 }
-                
                 .ahora-cards { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
-                
                 .ahora-card { 
                     background: #f9f9fb; 
                     border: 1px solid #e5e5ea; 
                     border-radius: 16px; 
                     padding: 14px 16px; 
                     cursor: pointer; 
-                    transition: all 0.2s ease; 
                 }
-                
                 .ahora-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
                 .ahora-card:active { transform: scale(0.98); }
-                
                 .ahora-card-header {
                     display: flex;
                     align-items: center;
                     gap: 12px;
                     margin-bottom: 12px;
                 }
-                
                 .ahora-card-icono { 
                     font-size: 24px; 
                     width: 40px;
@@ -351,29 +310,24 @@ async function renderizarAhoraContent() {
                     align-items: center;
                     justify-content: center;
                 }
-                
                 .ahora-card-titulo { 
                     font-size: 14px; 
                     font-weight: 700; 
                     color: #1c1c1e; 
                     flex: 1;
                 }
-                
                 .ahora-card-flecha { 
                     font-size: 14px; 
                     color: #c7c7cc; 
                 }
-                
                 .ahora-card-contenido {
                     padding-left: 52px;
                 }
-                
                 .ahora-card-desc { 
                     font-size: 12px; 
                     color: #8e8e93; 
                     margin-bottom: 8px;
                 }
-                
                 .ahora-card-badge { 
                     background: #ff9500; 
                     color: white; 
@@ -383,18 +337,15 @@ async function renderizarAhoraContent() {
                     font-weight: 600; 
                     display: inline-block;
                 }
-                
                 .ahora-card-badge.completado { background: #34c759; }
                 .ahora-card-badge.pendiente { background: #8e8e93; }
                 .ahora-card-badge.pulso50 { background: #ff9500; }
-                
                 .ahora-footer { 
                     padding: 12px 16px; 
                     text-align: center; 
                     border-top: 1px solid #e5e5ea; 
                     margin-top: 4px; 
                 }
-                
                 .ahora-footer-text { 
                     font-size: 10px; 
                     color: #8e8e93; 
@@ -407,7 +358,6 @@ async function renderizarAhoraContent() {
             </div>
             
             <div class="ahora-cards">
-                <!-- CARD 1: PARTIDOS DEL DÍA -->
                 <div class="ahora-card" data-accion="partidos">
                     <div class="ahora-card-header">
                         <div class="ahora-card-icono">⚽</div>
@@ -419,7 +369,6 @@ async function renderizarAhoraContent() {
                     </div>
                 </div>
                 
-                <!-- CARD 2: FINALISTAS -->
                 <div class="ahora-card" data-accion="ciclo2">
                     <div class="ahora-card-header">
                         <div class="ahora-card-icono">🏆</div>
@@ -432,7 +381,6 @@ async function renderizarAhoraContent() {
                     </div>
                 </div>
                 
-                <!-- CARD 3: REGLAS -->
                 <div class="ahora-card" data-accion="reglas">
                     <div class="ahora-card-header">
                         <div class="ahora-card-icono">📖</div>
