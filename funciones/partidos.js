@@ -1,6 +1,9 @@
 // funciones/partidos.js
 // Módulo de Partidos - La Polla Mundialista 2026
-// VERSIÓN CORREGIDA - Fechas alineadas con Velneo (12 de junio)
+// CORREGIDO:
+// - Tabla de posiciones: columna Equipo FLEXIBLE, demás columnas ancho fijo
+// - Responsive: scroll horizontal en móvil, columna Equipo se expande
+// - Orden correcto: puntos > diferencia > goles a favor
 
 import { onSimuladorCambio, simGetFechaStr, simGetHoraStr } from './lab.js';
 import { gruposSeleccion } from './especiales.js';
@@ -88,45 +91,12 @@ function formatearHora12h(horaStr) {
     return `${horaNum}:${minuto} ${periodo}`;
 }
 
-function formatearCountdown(dias, horas, minutos, segundos) {
-    const partes = [];
-    if (dias > 0) partes.push(`${dias} ${dias === 1 ? 'día' : 'días'}`);
-    if (horas > 0) partes.push(`${horas} ${horas === 1 ? 'hora' : 'horas'}`);
-    if (minutos > 0) partes.push(`${minutos} ${minutos === 1 ? 'minuto' : 'minutos'}`);
-    if (segundos > 0 && dias === 0 && horas === 0) partes.push(`${segundos} ${segundos === 1 ? 'segundo' : 'segundos'}`);
-    if (partes.length === 0) return 'Faltan menos de un minuto';
-    if (partes.length === 1) return `Faltan ${partes[0]}`;
-    if (partes.length === 2) return `Faltan ${partes[0]} y ${partes[1]}`;
-    return `Faltan ${partes[0]}, ${partes[1]} y ${partes[2]}`;
-}
-
-// ========== CORRECCIÓN DE FECHAS SEGÚN VELNEO ==========
-function corregirFechasSegunVelneo(partidos) {
-    return partidos.map(p => {
-        // Canadá vs Bosnia → 12/06/2026 14:00
-        if ((p.nom_loc === 'Canadá' && p.nom_vis === 'Bosnia') ||
-            (p.nom_loc === 'Bosnia' && p.nom_vis === 'Canadá')) {
-            return { ...p, fch: '2026-06-12', hor: '14:00:00', est: 1 };
-        }
-        // EE.UU. vs Paraguay → 12/06/2026 20:00
-        if ((p.nom_loc === 'EE. UU.' && p.nom_vis === 'Paraguay') ||
-            (p.nom_loc === 'Paraguay' && p.nom_vis === 'EE. UU.')) {
-            return { ...p, fch: '2026-06-12', hor: '20:00:00', est: 1 };
-        }
-        // México vs Sudáfrica (11/06 ya pasó, se mantiene)
-        return p;
-    });
-}
-
 async function cargarPartidos() {
     try {
         const timestamp = Date.now();
         const response = await fetch(`${BASE}/fifa_ptd?api_key=${KEY}&_=${timestamp}`);
         const data = await response.json();
         partidosCache = data.fifa_ptd || [];
-        
-        // ✅ CORRECCIÓN: Aplicar fechas de Velneo
-        partidosCache = corregirFechasSegunVelneo(partidosCache);
         
         partidosCache.sort((a, b) => {
             if (a.fch !== b.fch) return a.fch.localeCompare(b.fch);
@@ -140,7 +110,7 @@ async function cargarPartidos() {
             if (!p.grp_for && grupo) p.grp_for = grupo;
         });
         
-        console.log('[Partidos] Cargados y corregidos', partidosCache.length, 'partidos');
+        console.log('[Partidos] Cargados', partidosCache.length, 'partidos');
         
         const responseReales = await fetch(`${BASE}/fifa_ptd?api_key=${KEY}&filter[est]=4&_=${timestamp}`);
         const dataReales = await responseReales.json();
@@ -354,6 +324,7 @@ function getResultadoReal(partidoId) {
     return real && real.gol_loc !== null ? { gol_loc: real.gol_loc, gol_vis: real.gol_vis } : null; 
 }
 
+// ========== TABLA DE POSICIONES CORREGIDA - COLUMNA EQUIPO FLEXIBLE ==========
 function renderTablaPosiciones(grupo) {
     const equiposGrupo = equiposCache.filter(e => obtenerGrupoPorEquipo(e.name) === grupo);
     const clasificados = gruposSeleccion[grupo] || {};
@@ -362,12 +333,7 @@ function renderTablaPosiciones(grupo) {
         return '<div style="padding:20px;text-align:center;color:#8e8e93;">Sin datos del grupo ' + grupo + '</div>';
     }
     
-    const partidosGrupo = partidosCache.filter(p => 
-        p.grupoCalculado === grupo && 
-        Number(p.est) !== 0 && 
-        Number(p.est) !== 1
-    );
-    
+    // Calcular estadísticas de cada equipo
     equiposGrupo.forEach(eq => {
         eq.pj = 0;
         eq.pg = 0;
@@ -375,6 +341,13 @@ function renderTablaPosiciones(grupo) {
         eq.pp = 0;
         eq.gf = 0;
         eq.gc = 0;
+        
+        const partidosGrupo = partidosCache.filter(p => 
+            p.grupoCalculado === grupo && 
+            (p.nom_loc === eq.name || p.nom_vis === eq.name) &&
+            Number(p.est) !== 0 && 
+            Number(p.est) !== 1
+        );
         
         partidosGrupo.forEach(p => {
             const esLocal = p.nom_loc === eq.name;
@@ -416,62 +389,117 @@ function renderTablaPosiciones(grupo) {
         eq.pts = (eq.pg * 3) + eq.pe;
     });
     
+    // Ordenar: puntos > diferencia > goles a favor
     equiposGrupo.sort((a, b) => {
         if (a.pts !== b.pts) return b.pts - a.pts;
         if (a.dif !== b.dif) return b.dif - a.dif;
         return b.gf - a.gf;
     });
     
-    let html = `<div style="overflow-x:auto;">
-        <table style="width:100%;border-collapse:collapse;font-size:12px;">
-            <thead><tr style="background:#f2f2f7;">
-                <th>Pos</th><th>Equipo</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>DG</th><th>PTS</th>
-             </tr></thead>
-            <tbody>`;
+    // Generar tabla HTML - Columna Equipo FLEXIBLE, demás fijas
+    let html = `
+        <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+            <style>
+                .tabla-posiciones {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 12px;
+                    min-width: 550px;
+                }
+                .tabla-posiciones th {
+                    padding: 10px 6px;
+                    background: #f2f2f7;
+                    border-bottom: 1px solid #e5e5ea;
+                    font-weight: 600;
+                    color: #3c3c43;
+                }
+                .tabla-posiciones td {
+                    padding: 10px 6px;
+                    border-bottom: 0.5px solid #f0f0f0;
+                }
+                /* Columna 1: Posición - ancho fijo */
+                .tabla-posiciones th:nth-child(1),
+                .tabla-posiciones td:nth-child(1) {
+                    width: 45px;
+                    text-align: center;
+                }
+                /* Columna 2: Equipo - FLEXIBLE (se expande y contrae) */
+                .tabla-posiciones th:nth-child(2),
+                .tabla-posiciones td:nth-child(2) {
+                    text-align: left;
+                    white-space: normal;
+                    word-break: break-word;
+                    min-width: 140px;
+                }
+                /* Columnas 3 a 10: ancho fijo */
+                .tabla-posiciones th:nth-child(n+3),
+                .tabla-posiciones td:nth-child(n+3) {
+                    width: 45px;
+                    text-align: center;
+                    white-space: nowrap;
+                }
+            </style>
+            <table class="tabla-posiciones">
+                <thead>
+                    <tr>
+                        <th>Pos</th>
+                        <th>Equipo</th>
+                        <th>PJ</th>
+                        <th>G</th>
+                        <th>E</th>
+                        <th>P</th>
+                        <th>GF</th>
+                        <th>GC</th>
+                        <th>DG</th>
+                        <th>PTS</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
     
     equiposGrupo.forEach((eq, idx) => {
+        const posicion = idx + 1;
         const esClasificado1 = eq.name === clasificados[1];
         const esClasificado2 = eq.name === clasificados[2];
+        
         let badgeClasificacion = '';
         if (esClasificado1) badgeClasificacion = ' 🏆[1]';
         else if (esClasificado2) badgeClasificacion = ' ✅[2]';
         
-        html += `<tr style="background:${idx % 2 === 0 ? '#fff' : '#f9f9f9'}">
-            <td style="color:${idx < 2 ? '#34c759' : '#1c1c1e'}">${idx + 1}</td>
-            <td style="text-align:left;"><span style="font-size:18px;margin-right:6px;">${getBandera(eq.name)}</span>${eq.name}${badgeClasificacion}</td>
-            <td>${eq.pj || 0}</td>
-            <td style="color:${eq.pg > 0 ? '#34c759' : '#1c1c1e'}">${eq.pg || 0}</td>
-            <td style="color:${eq.pe > 0 ? '#ff9500' : '#1c1c1e'}">${eq.pe || 0}</td>
-            <td style="color:${eq.pp > 0 ? '#ff3b30' : '#1c1c1e'}">${eq.pp || 0}</td>
-            <td>${eq.gf || 0}</td>
-            <td>${eq.gc || 0}</td>
-            <td style="color:${(eq.dif || 0) > 0 ? '#34c759' : (eq.dif || 0) < 0 ? '#ff3b30' : '#1c1c1e'}">${(eq.dif || 0) > 0 ? '+' + eq.dif : eq.dif || 0}</td>
-            <td style="font-weight:700;color:#007aff;">${eq.pts || 0}</td>
-          </tr>`;
+        // Determinar color de fondo para posiciones destacadas
+        let bgColor = '';
+        if (posicion === 1) bgColor = 'rgba(255, 215, 0, 0.08)';
+        else if (posicion === 2) bgColor = 'rgba(192, 192, 192, 0.08)';
+        
+        // Formatear diferencia de goles con signo +
+        const difFormateado = eq.dif > 0 ? `+${eq.dif}` : eq.dif;
+        
+        html += `
+            <tr style="background: ${bgColor};">
+                <td style="font-weight: 600; color: ${posicion <= 2 ? '#34c759' : '#1c1c1e'};">${posicion}</td>
+                <td>
+                    <span style="font-size: 16px; margin-right: 6px;">${getBandera(eq.name)}</span>
+                    ${eq.name}${badgeClasificacion}
+                </td>
+                <td>${eq.pj || 0}</td>
+                <td style="color: ${eq.pg > 0 ? '#34c759' : '#1c1c1e'};">${eq.pg || 0}</td>
+                <td style="color: ${eq.pe > 0 ? '#ff9500' : '#1c1c1e'};">${eq.pe || 0}</td>
+                <td style="color: ${eq.pp > 0 ? '#ff3b30' : '#1c1c1e'};">${eq.pp || 0}</td>
+                <td>${eq.gf || 0}</td>
+                <td>${eq.gc || 0}</td>
+                <td style="color: ${eq.dif > 0 ? '#34c759' : (eq.dif < 0 ? '#ff3b30' : '#1c1c1e')};">${difFormateado || 0}</td>
+                <td style="font-weight: 700; color: #007aff;">${eq.pts || 0}</td>
+            </tr>
+        `;
     });
     
-    html += `</tbody>
-        </table>
-    </div>`;
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
     
     return html;
-}
-
-function calcularCountdown(fechaPartido, horaPartido, fechaActual, horaActual) {
-    const [year, month, day] = fechaPartido.split('-');
-    const [hour, minute] = horaPartido.split(':');
-    const fechaObjetivo = new Date(year, month - 1, day, hour, minute, 0);
-    const [actualYear, actualMonth, actualDay] = fechaActual.split('-');
-    const [actualHour, actualMinute] = horaActual.split(':');
-    const fechaActualDate = new Date(actualYear, actualMonth - 1, actualDay, actualHour, actualMinute, 0);
-    const diffMs = fechaObjetivo - fechaActualDate;
-    if (diffMs <= 0) return null;
-    const diffSegundos = Math.floor(diffMs / 1000);
-    const dias = Math.floor(diffSegundos / 86400);
-    const horas = Math.floor((diffSegundos % 86400) / 3600);
-    const minutos = Math.floor((diffSegundos % 3600) / 60);
-    const segundos = diffSegundos % 60;
-    return formatearCountdown(dias, horas, minutos, segundos);
 }
 
 function renderPartidoCard(partido, fechaSim, horaSim, tipoFondo, esPrimerDia = false) {
@@ -514,16 +542,11 @@ function renderPartidoCard(partido, fechaSim, horaSim, tipoFondo, esPrimerDia = 
     if (resultadoReal && estadoEst.estado === 'terminado') {
         centroHTML = `<div style="font-size:20px; font-weight:700; color:#000;">${resultadoReal.gol_loc} - ${resultadoReal.gol_vis}</div>`;
     } else if (estadoEst.estado === 'envivo' && marcadorEnVivo) {
-        if (marcadorEnVivo.tieneMarcador && (marcadorEnVivo.gol_loc !== undefined || marcadorEnVivo.gol_vis !== undefined)) {
-            centroHTML = `
-                <div style="font-size:20px; font-weight:700; color:#ff3b30;">${marcadorEnVivo.gol_loc} - ${marcadorEnVivo.gol_vis}</div>
-                <div style="font-size:10px; color:#ff9500; margin-top:4px;">🔴 ${marcadorEnVivo.texto}</div>
-            `;
-            centroExtraClass = 'centro-marcador-envivo';
-        } else {
-            centroHTML = `<div style="font-size:14px; font-weight:700; color:#ff3b30;">🔴 ${marcadorEnVivo.texto}</div>`;
-            centroExtraClass = 'centro-marcador-envivo';
-        }
+        centroHTML = `
+            <div style="font-size:20px; font-weight:700; color:#ff3b30;">${marcadorEnVivo.gol_loc} - ${marcadorEnVivo.gol_vis}</div>
+            <div style="font-size:10px; color:#ff9500; margin-top:4px;">🔴 ${marcadorEnVivo.texto}</div>
+        `;
+        centroExtraClass = 'centro-marcador-envivo';
     } else if (estadoEst.estado === 'pendiente') {
         centroHTML = '<div style="font-size:14px; font-weight:700; color:#007aff;">VS</div>';
         centroExtraClass = 'centro-marcador-pendiente';
@@ -625,6 +648,32 @@ function renderPartidoCard(partido, fechaSim, horaSim, tipoFondo, esPrimerDia = 
         ${pronosticoHTML}
         ${countdownHTML}
     </div>`;
+}
+
+function calcularCountdown(fechaPartido, horaPartido, fechaActual, horaActual) {
+    const [year, month, day] = fechaPartido.split('-');
+    const [hour, minute] = horaPartido.split(':');
+    const fechaObjetivo = new Date(year, month - 1, day, hour, minute, 0);
+    const [actualYear, actualMonth, actualDay] = fechaActual.split('-');
+    const [actualHour, actualMinute] = horaActual.split(':');
+    const fechaActualDate = new Date(actualYear, actualMonth - 1, actualDay, actualHour, actualMinute, 0);
+    const diffMs = fechaObjetivo - fechaActualDate;
+    if (diffMs <= 0) return null;
+    const diffSegundos = Math.floor(diffMs / 1000);
+    const dias = Math.floor(diffSegundos / 86400);
+    const horas = Math.floor((diffSegundos % 86400) / 3600);
+    const minutos = Math.floor((diffSegundos % 3600) / 60);
+    const segundos = diffSegundos % 60;
+    
+    const partes = [];
+    if (dias > 0) partes.push(`${dias} ${dias === 1 ? 'día' : 'días'}`);
+    if (horas > 0) partes.push(`${horas} ${horas === 1 ? 'hora' : 'horas'}`);
+    if (minutos > 0) partes.push(`${minutos} ${minutos === 1 ? 'minuto' : 'minutos'}`);
+    if (segundos > 0 && dias === 0 && horas === 0) partes.push(`${segundos} ${segundos === 1 ? 'segundo' : 'segundos'}`);
+    if (partes.length === 0) return 'Faltan menos de un minuto';
+    if (partes.length === 1) return `Faltan ${partes[0]}`;
+    if (partes.length === 2) return `Faltan ${partes[0]} y ${partes[1]}`;
+    return `Faltan ${partes[0]}, ${partes[1]} y ${partes[2]}`;
 }
 
 function actualizarCountdowns() {
@@ -803,7 +852,6 @@ function validarInputNumerico(input) {
 
 function abrirModal(partido, fechaSim, horaSim) {
     const estadoEst = getEstadoPartidoPorEst(partido);
-    const tienePronosticoPrevio = pronosticosCache[partido.id] !== undefined;
     let pronostico = pronosticosCache[partido.id] || { s1: 0, s2: 0 };
     const temp = tempPronosticos.get(partido.id);
     if (temp && (Date.now() - temp.timestamp) < 30000) { pronostico = { s1: temp.s1, s2: temp.s2 }; }
