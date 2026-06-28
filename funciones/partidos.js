@@ -23,6 +23,7 @@
 // - ✅ NUEVO: INDICADOR "⭐ avanza en alargue" en cards de partidos
 // - ✅ NUEVO: Modal carga pronóstico existente (inputs y selector de alargue)
 // - ✅ NUEVO: Modal de partido terminado con desglose de puntos
+// - ✅ NUEVO: Badge "MARCADOR 90 MINUTOS" debajo de la cancha en el modal
 // - ✅ CORREGIDO: cargarPronosticos() LEE pro_res DE VELNEO
 // - ✅ CORREGIDO: obtenerPronosticoFresco() LEE pro_res DE VELNEO
 // - ✅ CORREGIDO: obtenerPronosticoActual() LEE pro_res DE VELNEO
@@ -360,7 +361,6 @@ function actualizarCardPartido(ptdId, s1, s2) {
 async function cargarPronosticos(jugId, forceRefresh = false) {
     if (!jugId) return;
     
-    // Si no se fuerza refresh, intentar usar localStorage
     if (!forceRefresh) {
         const locales = cargarPronosticosPartidosLocal();
         if (locales && Object.keys(locales).length > 0) { 
@@ -370,7 +370,6 @@ async function cargarPronosticos(jugId, forceRefresh = false) {
         }
     }
     
-    // Si forceRefresh=true o no hay datos en localStorage, consultar API
     try {
         const timestamp = Date.now();
         const response = await fetch(`${BASE_V2}/fifa_jug_pro?api_key=${KEY}&filter[id]=${jugId}&fields=jug,jug.name,id,ptd,pro_gol_loc,pro_gol_vis,pro_res,pul&_=${timestamp}`);
@@ -1229,8 +1228,27 @@ function abrirModal(partido, fechaSim, horaSim) {
     const alargueGuardado = (esFaseFinal && pronostico.pro_res === '1') ? 'local' : 
                            (esFaseFinal && pronostico.pro_res === '2') ? 'visita' : null;
     
+    // ========== BADGE "MARCADOR 90 MINUTOS" ==========
+    let badge90HTML = `
+        <div style="text-align: center; margin-bottom: 12px;">
+            <span style="
+                display: inline-block;
+                background: #ffd60a;
+                color: #1a1a2e;
+                font-size: 11px;
+                font-weight: 700;
+                padding: 3px 14px;
+                border-radius: 20px;
+                letter-spacing: 0.5px;
+            ">
+                🟡 MARCADOR 90 MINUTOS
+            </span>
+        </div>
+    `;
+    
+    // ========== BADGE 0-0 ==========
     let badgeZeroHTML = `
-        <div style="text-align: center; margin-bottom: 16px;">
+        <div style="text-align: center; margin-bottom: 12px;">
             <div style="background:rgb(17, 55, 95); color: white; font-size: 12px; font-weight: 500; padding: 6px 14px; border-radius: 20px; display: inline-block; line-height: 1.4;">
                 ⚠️ Si tu pronóstico es 0-0<br>
                 <span style="color: #ffd60a;">selecciona explícitamente 0 - 0</span>
@@ -1238,6 +1256,7 @@ function abrirModal(partido, fechaSim, horaSim) {
         </div>
     `;
     
+    // ========== SELECTOR DE ALARGUE ==========
     let alargueHTML = '';
     if (esFaseFinal) {
         const bonusAlargueVal = Math.round(ptsBase * 0.4);
@@ -1274,7 +1293,7 @@ function abrirModal(partido, fechaSim, horaSim) {
         </div>
         <div style="font-size:12px;color:#8e8e93;margin-bottom:20px;text-align:center;">${formatearFecha(partido.fch)} · ${formatearHora12h(partido.hor)}</div>
         
-        <div style="background: linear-gradient(135deg, #0a2f1f 0%, #1a5a3a 100%); border-radius: 20px; padding: 16px; margin-bottom: 20px; position: relative; overflow: hidden;">
+        <div style="background: linear-gradient(135deg, #0a2f1f 0%, #1a5a3a 100%); border-radius: 20px; padding: 16px; margin-bottom: 16px; position: relative; overflow: hidden;">
             <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: repeating-linear-gradient(90deg, rgba(0,0,0,0.1) 0px, rgba(0,0,0,0.1) 2px, transparent 2px, transparent 20px); pointer-events: none;"></div>
             <div style="position: absolute; top: 0; left: 0; width: 100%; height: 20%; background: linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%); pointer-events: none;"></div>
             <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 20%; background: linear-gradient(0deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%); pointer-events: none;"></div>
@@ -1288,7 +1307,9 @@ function abrirModal(partido, fechaSim, horaSim) {
             </div>
         </div>
         
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:16px;">
+        ${badge90HTML}
+        
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:12px;">
             <div style="flex:1; text-align:center;">
                 <div style="display:flex; align-items:center; justify-content:center; gap:8px; background:#f9f9fb; border-radius:30px; padding:6px 10px;">
                     <button id="modal-dec-loc" style="width:36px;height:36px;border-radius:18px;background:#fff;border:1px solid #e5e5ea;font-size:18px;font-weight:700;cursor:pointer; display:flex; align-items:center; justify-content:center;">−</button>
@@ -1414,18 +1435,17 @@ async function refrescarDatosPartidos() {
     mostrarToast('⟳ Actualizando partidos...', 'info');
     await cargarEquipos();
     await cargarPartidos();
-    await cargarPronosticos(currentJugador?.id, true);  // forceRefresh = true
+    await cargarPronosticos(currentJugador?.id, true);
     refrescarContenido();
     mostrarToast('✅ Partidos actualizados', 'ok');
 }
 
-// ========== REFRESCAR CONTENIDO CON FILTRO DINÁMICO ==========
 async function refrescarContenido() {
     const contenedorScroll = document.getElementById('partidos-contenido-scroll');
     if (!contenedorScroll) return;
     
     if (currentJugador) {
-        await cargarPronosticos(currentJugador.id, false);  // Usa cache para rendimiento
+        await cargarPronosticos(currentJugador.id, false);
         const especialesData = cargarPronosticosEspecialesLocal();
         if (especialesData.grupos) {
             Object.assign(gruposSeleccion, especialesData.grupos);
@@ -1533,7 +1553,6 @@ function cambiarTab(tab) {
     refrescarContenido(); 
 }
 
-// ========== RENDERIZAR PARTIDOS (forceRefresh = true) ==========
 export async function renderizarPartidos(contenedor, datosCuenta, tabInicial = 'todos') {
     if (!contenedor) return;
     currentJugador = datosCuenta;
@@ -1545,7 +1564,7 @@ export async function renderizarPartidos(contenedor, datosCuenta, tabInicial = '
     
     await cargarEquipos();
     await cargarPartidos();
-    await cargarPronosticos(datosCuenta.id, true);  // ✅ SIEMPRE CONSULTA API AL ABRIR PARTIDOS
+    await cargarPronosticos(datosCuenta.id, true);
     
     const especialesData = cargarPronosticosEspecialesLocal();
     if (especialesData.grupos) {
