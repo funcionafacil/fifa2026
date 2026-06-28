@@ -20,9 +20,12 @@
 // - ✅ NUEVO: Captura correcta de la selección de alargue al guardar
 // - ✅ NUEVO: pro_res se sobrescribe correctamente con la selección de alargue
 // - ✅ NUEVO: pro_res se guarda en pronosticosCache
-// - ✅ NUEVO: Indicador "⭐ avanza en alargue" en cards de partidos
-// - ✅ NUEVO: Modal carga pronóstico existente (inputs y selector de alargue)
+// - ✅ NUEVO: INDICADOR "⭐ avanza en alargue" en cards de partidos (LEE pro_res DE VELNEO)
+// - ✅ NUEVO: Modal carga pronóstico existente (inputs y selector de alargue) (LEE pro_res DE VELNEO)
 // - ✅ NUEVO: Modal de partido terminado con desglose de puntos
+// - ✅ CORREGIDO: cargarPronosticos() LEE pro_res DE VELNEO
+// - ✅ CORREGIDO: obtenerPronosticoFresco() LEE pro_res DE VELNEO
+// - ✅ CORREGIDO: obtenerPronosticoActual() LEE pro_res DE VELNEO
 // - Acepta parámetro tabInicial (todos/grupos/colombia)
 // - Scroll automático al inicio cuando se cambia a GRUPOS
 // - Grupo A activo por defecto al entrar a GRUPOS
@@ -248,6 +251,8 @@ function getMarcadorEnVivo(partido) {
     return null;
 }
 
+// ========== FUNCIONES DE LECTURA DE VELNEO (CORREGIDAS: LEEN pro_res) ==========
+
 async function obtenerPronosticoActual(ptdId) {
     if (!currentJugador) return null;
     try {
@@ -259,7 +264,8 @@ async function obtenerPronosticoActual(ptdId) {
             return { 
                 s1: pronostico.pro_gol_loc || 0, 
                 s2: pronostico.pro_gol_vis || 0,
-                pul: pronostico.pul || '0'
+                pul: pronostico.pul || '0',
+                pro_res: pronostico.pro_res || 'X'   // ⬅️ LEER pro_res
             };
         }
         return null;
@@ -280,7 +286,8 @@ async function obtenerPronosticoFresco(ptdId) {
             return { 
                 s1: pronostico.pro_gol_loc || 0, 
                 s2: pronostico.pro_gol_vis || 0,
-                pul: pronostico.pul || '0'
+                pul: pronostico.pul || '0',
+                pro_res: pronostico.pro_res || 'X'   // ⬅️ LEER pro_res
             };
         }
         return null;
@@ -295,7 +302,12 @@ async function sincronizarConVelneo(ptdId) {
     try {
         const valorActual = await obtenerPronosticoActual(ptdId);
         if (valorActual) {
-            pronosticosCache[ptdId] = { s1: valorActual.s1, s2: valorActual.s2, pul: valorActual.pul, pro_res: valorActual.pro_res || 'X' };
+            pronosticosCache[ptdId] = { 
+                s1: valorActual.s1, 
+                s2: valorActual.s2, 
+                pul: valorActual.pul, 
+                pro_res: valorActual.pro_res || 'X' 
+            };
             guardarPronosticosPartidosLocal(pronosticosCache);
             const temp = tempPronosticos.get(ptdId);
             if (temp && (temp.s1 !== valorActual.s1 || temp.s2 !== valorActual.s2)) {
@@ -342,6 +354,7 @@ function actualizarCardPartido(ptdId, s1, s2) {
     }
 }
 
+// ========== CARGAR PRONÓSTICOS (CORREGIDO: LEE pro_res DE VELNEO) ==========
 async function cargarPronosticos(jugId, forceRefresh = false) {
     if (!jugId) return;
     
@@ -364,7 +377,7 @@ async function cargarPronosticos(jugId, forceRefresh = false) {
                 s1: p.pro_gol_loc || 0, 
                 s2: p.pro_gol_vis || 0,
                 pul: p.pul || '0',
-                pro_res: p.pro_res || 'X'
+                pro_res: p.pro_res || 'X'   // ⬅️ LEER pro_res
             }; 
         });
         guardarPronosticosPartidosLocal(pronosticosCache);
@@ -381,7 +394,12 @@ async function refrescarPronosticoSiTerminado(ptdId, est) {
             const actual = pronosticosCache[ptdId];
             if (!actual || actual.s1 !== pronosticoFresco.s1 || actual.s2 !== pronosticoFresco.s2 || actual.pul !== pronosticoFresco.pul) {
                 console.log(`[Partidos] Actualizando pronóstico fresco para partido terminado ${ptdId}: pul=${pronosticoFresco.pul}`);
-                pronosticosCache[ptdId] = { s1: pronosticoFresco.s1, s2: pronosticoFresco.s2, pul: pronosticoFresco.pul, pro_res: pronosticoFresco.pro_res || 'X' };
+                pronosticosCache[ptdId] = { 
+                    s1: pronosticoFresco.s1, 
+                    s2: pronosticoFresco.s2, 
+                    pul: pronosticoFresco.pul, 
+                    pro_res: pronosticoFresco.pro_res || 'X' 
+                };
                 guardarPronosticosPartidosLocal(pronosticosCache);
                 return pronosticoFresco;
             }
@@ -768,7 +786,7 @@ async function renderPartidoCard(partido, fechaSim, horaSim, tipoFondo, esPrimer
         } else {
             // ========== PRONÓSTICO CON INDICADOR DE ALARGUE ==========
             let alargueInfo = '';
-            // Obtener pro_res de la cache
+            // Obtener pro_res de la cache (LEÍDO DE VELNEO)
             const pro_res = pronosticosCache[partido.id]?.pro_res || 'X';
             const avanzaLocal = pro_res === '1';
             const avanzaVisita = pro_res === '2';
@@ -1064,7 +1082,7 @@ function validarInputNumerico(input) {
 
 function abrirModal(partido, fechaSim, horaSim) {
     const estadoEst = getEstadoPartidoPorEst(partido);
-    // ⭐ CARGAR pro_res DESDE LA CACHE
+    // ⭐ CARGAR pro_res DESDE LA CACHE (LEÍDO DE VELNEO)
     let pronostico = pronosticosCache[partido.id] || { s1: 0, s2: 0, pul: '0', pro_res: 'X' };
     const temp = tempPronosticos.get(partido.id);
     if (temp && (Date.now() - temp.timestamp) < 30000) { 
