@@ -6,6 +6,7 @@
 // - Click → redirige a partidos.js con tab='todos'
 // - MOCK INTELIGENTE: solo se muestra si NO hay partidos reales en la API
 // - Countdown para partidos pendientes
+// - CARD INFORMATIVA: explica 90 minutos + alargue + puntos extra
 
 import { cargarPartidos, getBandera, formatearHora12h } from './partidos.js';
 
@@ -157,7 +158,6 @@ function detenerCountdownAhora() {
 
 // ========== GENERAR MOCK PARA PRUEBAS ==========
 function generarMockPartidos() {
-    // Fecha actual para el mock
     const hoy = getLocalDate();
     return [
         { id: 9991, nom_loc: 'Suiza', nom_vis: 'Canadá', fch: hoy, hor: '14:00:00', est: '1', grp_for: 'B', fas: '1' },
@@ -167,6 +167,35 @@ function generarMockPartidos() {
         { id: 9995, nom_loc: 'República Checa', nom_vis: 'México', fch: hoy, hor: '20:00:00', est: '1', grp_for: 'A', fas: '1' },
         { id: 9996, nom_loc: 'Sudáfrica', nom_vis: 'República de Corea', fch: hoy, hor: '20:00:00', est: '1', grp_for: 'A', fas: '1' }
     ];
+}
+
+// ========== RENDERIZAR CARD INFORMATIVA ==========
+function renderizarInfoCard() {
+    return `
+        <div style="
+            background: rgba(0, 122, 255, 0.05);
+            border: 1px solid rgba(0, 122, 255, 0.10);
+            border-radius: 12px;
+            padding: 10px 14px;
+            margin: 6px 12px 10px 12px;
+            font-size: 11px;
+            color: #1c1c1e;
+            line-height: 1.5;
+        ">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 2px;">
+                <span style="font-size: 14px;">📋</span>
+                <span style="font-weight: 700; color: #007aff; font-size: 12px;">¿Cómo funciona el pronóstico?</span>
+            </div>
+            <div style="padding-left: 4px;">
+                ⚽ El marcador que pronostiques es para el partido de <strong>90 minutos</strong>.
+                <br>
+                ⭐ En fases finales (16avos en adelante), si el partido termina empatado, 
+                podrás elegir qué equipo avanza en el <strong>alargue</strong>.
+                <br>
+                ✅ Si aciertas quién avanza, sumas <strong style="color: #f1c40f;">puntos extra</strong>.
+            </div>
+        </div>
+    `;
 }
 
 // ========== RENDERIZAR FILA DE PARTIDO (3 COLUMNAS) ==========
@@ -282,6 +311,7 @@ async function renderizarAhora(contenedor, datosCuenta) {
     partidosHoy.sort((a, b) => (a.hor || '00:00:00').localeCompare(b.hor || '00:00:00'));
     
     let filasHtml = partidosHoy.map(p => renderizarFila(p)).join('');
+    let infoCardHTML = renderizarInfoCard();
     
     contenedor.innerHTML = `
         <style>
@@ -405,6 +435,9 @@ async function renderizarAhora(contenedor, datosCuenta) {
                 .ahora-titulo {
                     font-size: 14px;
                 }
+                .ahora-badge {
+                    font-size: 9px;
+                }
             }
         </style>
         
@@ -413,6 +446,8 @@ async function renderizarAhora(contenedor, datosCuenta) {
                 <div class="ahora-titulo">🏆 PARTIDOS DE HOY</div>
                 <span class="ahora-badge">🎯 HAZ TUS PRONÓSTICOS</span>
             </div>
+            
+            ${infoCardHTML}
             
             <div class="ahora-tabla-wrapper">
                 <table class="ahora-tabla">
