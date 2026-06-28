@@ -1,13 +1,11 @@
 // ahora.js - Módulo de partidos de hoy
-// VERSIÓN 7 COLUMNAS - Partidos simultáneos agrupados por bloque
-// Columnas: LOCAL | VS | VISITANTE | SEP | LOCAL | VS | VISITANTE
-// - Agrupa partidos por GRUPO + HORA (partidos simultáneos)
-// - 2 filas: Fila 1 (nombres), Fila 2 (banderas)
+// VERSIÓN 3 COLUMNAS - Tabla: LOCAL | VS | VISITANTE
+// - Lista plana de partidos (sin agrupación por grupo/hora)
 // - Scroll vertical DENTRO de la card
 // - SIN scroll horizontal
 // - Click → redirige a partidos.js con tab='todos'
 // - MOCK INTELIGENTE: solo se muestra si NO hay partidos reales en la API
-// - Nombres de equipos CORREGIDOS para que coincidan con la API y las banderas
+// - Countdown para partidos pendientes
 
 import { cargarPartidos, getBandera, formatearHora12h } from './partidos.js';
 
@@ -119,28 +117,6 @@ function getEstadoPartido(partido) {
     };
 }
 
-// ========== AGRUPAR PARTIDOS POR BLOQUE ==========
-function agruparPartidosPorBloque(partidos) {
-    const grupos = {};
-    
-    partidos.forEach(p => {
-        const clave = `${p.grp_for || 'X'}_${p.hor || '00:00:00'}`;
-        if (!grupos[clave]) {
-            grupos[clave] = {
-                grupo: p.grp_for || 'X',
-                hora: p.hor || '00:00:00',
-                partidos: []
-            };
-        }
-        grupos[clave].partidos.push(p);
-    });
-    
-    const bloques = Object.values(grupos);
-    bloques.sort((a, b) => a.hora.localeCompare(b.hora));
-    
-    return bloques;
-}
-
 // ========== ACTUALIZAR COUNTDOWNS ==========
 function actualizarCountdownsEnTabla() {
     const countdownElements = document.querySelectorAll('.ahora-countdown');
@@ -181,102 +157,81 @@ function detenerCountdownAhora() {
 
 // ========== GENERAR MOCK PARA PRUEBAS ==========
 function generarMockPartidos() {
-    // Fijamos la fecha al 24 de junio para pruebas
-    // Cuando la API tenga partidos reales, el mock se desactiva automáticamente
-    const fechaMock = '2026-06-24';
+    // Fecha actual para el mock
+    const hoy = getLocalDate();
     return [
-        { id: 9991, nom_loc: 'Suiza', nom_vis: 'Canadá', fch: fechaMock, hor: '14:00:00', est: '1', grp_for: 'B', fas: '1' },
-        { id: 9992, nom_loc: 'Bosnia', nom_vis: 'Catar', fch: fechaMock, hor: '14:00:00', est: '1', grp_for: 'B', fas: '1' },
-        { id: 9993, nom_loc: 'Escocia', nom_vis: 'Brasil', fch: fechaMock, hor: '17:00:00', est: '1', grp_for: 'C', fas: '1' },
-        { id: 9994, nom_loc: 'Marruecos', nom_vis: 'Haití', fch: fechaMock, hor: '17:00:00', est: '1', grp_for: 'C', fas: '1' },
-        { id: 9995, nom_loc: 'República Checa', nom_vis: 'México', fch: fechaMock, hor: '20:00:00', est: '1', grp_for: 'A', fas: '1' },
-        { id: 9996, nom_loc: 'Sudáfrica', nom_vis: 'República de Corea', fch: fechaMock, hor: '20:00:00', est: '1', grp_for: 'A', fas: '1' }
+        { id: 9991, nom_loc: 'Suiza', nom_vis: 'Canadá', fch: hoy, hor: '14:00:00', est: '1', grp_for: 'B', fas: '1' },
+        { id: 9992, nom_loc: 'Bosnia', nom_vis: 'Catar', fch: hoy, hor: '14:00:00', est: '1', grp_for: 'B', fas: '1' },
+        { id: 9993, nom_loc: 'Escocia', nom_vis: 'Brasil', fch: hoy, hor: '17:00:00', est: '1', grp_for: 'C', fas: '1' },
+        { id: 9994, nom_loc: 'Marruecos', nom_vis: 'Haití', fch: hoy, hor: '17:00:00', est: '1', grp_for: 'C', fas: '1' },
+        { id: 9995, nom_loc: 'República Checa', nom_vis: 'México', fch: hoy, hor: '20:00:00', est: '1', grp_for: 'A', fas: '1' },
+        { id: 9996, nom_loc: 'Sudáfrica', nom_vis: 'República de Corea', fch: hoy, hor: '20:00:00', est: '1', grp_for: 'A', fas: '1' }
     ];
 }
 
-// ========== RENDERIZAR BLOQUE DE PARTIDOS (7 COLUMNAS) ==========
-function renderizarBloque(bloque) {
-    const { grupo, hora, partidos } = bloque;
-    const horaFormateada = formatearHora12h(hora);
+// ========== RENDERIZAR FILA DE PARTIDO (3 COLUMNAS) ==========
+function renderizarFila(partido) {
+    const estado = getEstadoPartido(partido);
+    const horaFormateada = formatearHora12h(partido.hor);
+    const countdown = calcularCountdown(partido.fch?.split('T')[0], partido.hor);
     
-    const partidosOrdenados = [...partidos].sort((a, b) => a.nom_loc.localeCompare(b.nom_loc));
-    const p1 = partidosOrdenados[0];
-    const p2 = partidosOrdenados[1];
+    let vsContent = '';
     
-    const estado1 = getEstadoPartido(p1);
-    const estado2 = getEstadoPartido(p2);
-    
-    function getColumnaCentral(estado, partido) {
-        if (estado.tipo === 'terminado') {
-            return `
-                <div style="font-size: 13px; font-weight: 800; color: ${estado.badgeColor}; margin-bottom: 2px;">${estado.marcador}</div>
-                <div style="display: inline-flex; align-items: center; gap: 3px; background: ${estado.badgeColor}15; padding: 2px 8px; border-radius: 12px;">
-                    <span style="font-size: 8px;">${estado.badgeIcono}</span>
-                    <span style="font-size: 7px; font-weight: 600; color: ${estado.badgeColor};">${estado.badge}</span>
-                </div>
-            `;
-        } else if (estado.tipo === 'envivo') {
-            return `
-                <div style="font-size: 13px; font-weight: 800; color: ${estado.badgeColor}; margin-bottom: 2px;">${estado.marcador}</div>
-                <div style="display: inline-flex; align-items: center; gap: 3px; background: ${estado.badgeColor}15; padding: 2px 8px; border-radius: 12px;">
-                    <span style="font-size: 8px;">${estado.badgeIcono}</span>
-                    <span style="font-size: 7px; font-weight: 600; color: ${estado.badgeColor};">${estado.badge}</span>
-                </div>
-            `;
-        } else {
-            const countdownText = calcularCountdown(partido.fch?.split('T')[0], partido.hor);
-            return `
-                <div style="font-weight: 600; color: #8e8e93; font-size: 9px; margin-bottom: 1px;">VS</div>
-                ${countdownText ? `<div class="ahora-countdown" data-fch="${partido.fch?.split('T')[0]}" data-hor="${partido.hor}" style="font-size: 8px; font-weight: 600; color: #ff9500;">${countdownText}</div>` : '<div style="font-size: 7px; color: #8e8e93;">PENDIENTE</div>'}
-            `;
-        }
+    if (estado.tipo === 'terminado') {
+        vsContent = `
+            <div style="font-weight: 600; color: #8e8e93; font-size: 11px; margin-bottom: 4px;">VS</div>
+            <div style="font-size: 13px; font-weight: 600; color: #007aff; margin-bottom: 4px;">${horaFormateada}</div>
+            <div style="font-size: 16px; font-weight: 800; color: ${estado.badgeColor}; margin-bottom: 4px;">${estado.marcador}</div>
+            <div style="display: inline-flex; align-items: center; gap: 4px; background: ${estado.badgeColor}15; padding: 3px 10px; border-radius: 16px;">
+                <span style="font-size: 10px;">${estado.badgeIcono}</span>
+                <span style="font-size: 10px; font-weight: 600; color: ${estado.badgeColor};">${estado.badge}</span>
+            </div>
+        `;
+    } else if (estado.tipo === 'envivo') {
+        vsContent = `
+            <div style="font-weight: 600; color: #8e8e93; font-size: 11px; margin-bottom: 4px;">VS</div>
+            <div style="font-size: 13px; font-weight: 600; color: #007aff; margin-bottom: 4px;">${horaFormateada}</div>
+            <div style="font-size: 16px; font-weight: 800; color: ${estado.badgeColor}; margin-bottom: 4px;">${estado.marcador}</div>
+            <div style="display: inline-flex; align-items: center; gap: 4px; background: ${estado.badgeColor}15; padding: 3px 10px; border-radius: 16px;">
+                <span style="font-size: 10px;">${estado.badgeIcono}</span>
+                <span style="font-size: 10px; font-weight: 600; color: ${estado.badgeColor};">${estado.badge}</span>
+            </div>
+        `;
+    } else if (countdown) {
+        vsContent = `
+            <div style="font-weight: 600; color: #8e8e93; font-size: 11px; margin-bottom: 4px;">VS</div>
+            <div style="font-size: 13px; font-weight: 600; color: #007aff; margin-bottom: 4px;">${horaFormateada}</div>
+            <div class="ahora-countdown" data-fch="${partido.fch?.split('T')[0]}" data-hor="${partido.hor}" style="font-size: 11px; font-weight: 600; color: #ff9500;">${countdown}</div>
+        `;
+    } else {
+        vsContent = `
+            <div style="font-weight: 600; color: #8e8e93; font-size: 11px; margin-bottom: 4px;">VS</div>
+            <div style="font-size: 13px; font-weight: 600; color: #007aff; margin-bottom: 4px;">${horaFormateada}</div>
+            <div style="font-size: 10px; color: #8e8e93;">PENDIENTE</div>
+        `;
     }
-
-    const centro1 = getColumnaCentral(estado1, p1);
-    const centro2 = getColumnaCentral(estado2, p2);
     
-    const nombreLocal1 = p1.nom_loc.length > 10 ? p1.nom_loc.substring(0, 9) + '…' : p1.nom_loc;
-    const nombreVisita1 = p1.nom_vis.length > 10 ? p1.nom_vis.substring(0, 9) + '…' : p1.nom_vis;
-    const nombreLocal2 = p2.nom_loc.length > 10 ? p2.nom_loc.substring(0, 9) + '…' : p2.nom_loc;
-    const nombreVisita2 = p2.nom_vis.length > 10 ? p2.nom_vis.substring(0, 9) + '…' : p2.nom_vis;
-    
-    const badgeGrupo = grupo && grupo !== 'X' ? `Grupo ${grupo}` : 'Fase 1';
+    const nombreLocal = partido.nom_loc.length > 12 ? partido.nom_loc.substring(0, 11) + '…' : partido.nom_loc;
+    const nombreVisita = partido.nom_vis.length > 12 ? partido.nom_vis.substring(0, 11) + '…' : partido.nom_vis;
     
     return `
-        <div class="ahora-bloque" data-grupo="${grupo}" data-hora="${hora}" style="
-            background: rgba(255, 255, 255, 0.92);
-            backdrop-filter: blur(4px);
-            border-radius: 16px;
-            padding: 12px 10px;
-            margin-bottom: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-        ">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 4px;">
-                <span style="font-size: 12px; font-weight: 700; color: rgba(0,0,0,0.5);">${badgeGrupo}</span>
-                <span style="font-size: 11px; font-weight: 600; color: #007aff;">⏰ ${horaFormateada}</span>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 0.7fr 1fr 0.1fr 1fr 0.7fr 1fr; gap: 2px; align-items: center; text-align: center; margin-bottom: 4px;">
-                <div style="font-size: 10px; font-weight: 600; color: rgba(0,0,0,0.8);">${nombreLocal1}</div>
-                <div style="font-size: 10px; font-weight: 600; color: rgba(0,0,0,0.4);">${centro1}</div>
-                <div style="font-size: 10px; font-weight: 600; color: rgba(0,0,0,0.8);">${nombreVisita1}</div>
-                <div style="font-size: 10px; color: rgba(0,0,0,0.08); text-align: center;">│</div>
-                <div style="font-size: 10px; font-weight: 600; color: rgba(0,0,0,0.8);">${nombreLocal2}</div>
-                <div style="font-size: 10px; font-weight: 600; color: rgba(0,0,0,0.4);">${centro2}</div>
-                <div style="font-size: 10px; font-weight: 600; color: rgba(0,0,0,0.8);">${nombreVisita2}</div>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 0.7fr 1fr 0.1fr 1fr 0.7fr 1fr; gap: 2px; align-items: center; text-align: center;">
-                <div style="font-size: 28px; line-height: 1.2;">${getBandera(p1.nom_loc)}</div>
-                <div style="font-size: 10px; font-weight: 700; color: rgba(0,0,0,0.2);">VS</div>
-                <div style="font-size: 28px; line-height: 1.2;">${getBandera(p1.nom_vis)}</div>
-                <div style="font-size: 10px; color: rgba(0,0,0,0.06); text-align: center;">│</div>
-                <div style="font-size: 28px; line-height: 1.2;">${getBandera(p2.nom_loc)}</div>
-                <div style="font-size: 10px; font-weight: 700; color: rgba(0,0,0,0.2);">VS</div>
-                <div style="font-size: 28px; line-height: 1.2;">${getBandera(p2.nom_vis)}</div>
-            </div>
-        </div>
+        <tr class="ahora-fila" data-id="${partido.id}" style="cursor: pointer; border-bottom: 0.5px solid rgba(0,0,0,0.05);">
+            <td style="padding: 10px 6px; text-align: center; vertical-align: middle;">
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 3px;">
+                    <span style="font-size: 32px;">${getBandera(partido.nom_loc)}</span>
+                    <span style="font-weight: 600; color: #1c1c1e; font-size: 12px;">${nombreLocal}</span>
+                </div>
+            </td>
+            <td style="padding: 10px 6px; text-align: center; vertical-align: middle;">
+                ${vsContent}
+            </td>
+            <td style="padding: 10px 6px; text-align: center; vertical-align: middle;">
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 3px;">
+                    <span style="font-size: 32px;">${getBandera(partido.nom_vis)}</span>
+                    <span style="font-weight: 600; color: #1c1c1e; font-size: 12px;">${nombreVisita}</span>
+                </div>
+            </td>
+        </tr>
     `;
 }
 
@@ -306,8 +261,6 @@ async function renderizarAhora(contenedor, datosCuenta) {
     let partidosHoy = obtenerPartidosDeHoy(partidos);
     
     // ========== MOCK INTELIGENTE ==========
-    // Solo se ejecuta si NO hay partidos reales en la API
-    // Cuando la API tenga partidos reales, el mock se desactiva automáticamente
     if (partidosHoy.length === 0) {
         partidosHoy = generarMockPartidos();
         console.log('🧪 MODO PRUEBA - Usando mock porque no hay partidos reales en la API');
@@ -325,25 +278,28 @@ async function renderizarAhora(contenedor, datosCuenta) {
         return;
     }
     
-    const bloques = agruparPartidosPorBloque(partidosHoy);
-    let bloquesHtml = bloques.map(b => renderizarBloque(b)).join('');
+    // Ordenar partidos por hora
+    partidosHoy.sort((a, b) => (a.hor || '00:00:00').localeCompare(b.hor || '00:00:00'));
+    
+    let filasHtml = partidosHoy.map(p => renderizarFila(p)).join('');
     
     contenedor.innerHTML = `
         <style>
             .ahora-container {
-                background: rgba(255, 255, 255, 0.04);
+                background: rgba(255, 255, 255, 0.92);
                 backdrop-filter: blur(12px);
                 -webkit-backdrop-filter: blur(12px);
                 border-radius: 20px;
                 overflow: hidden;
-                border: 1px solid rgba(255, 255, 255, 0.06);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
                 display: flex;
                 flex-direction: column;
                 max-height: calc(100vh - 140px);
             }
             .ahora-header {
                 padding: 14px 12px 10px 12px;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+                border-bottom: 1px solid rgba(0, 0, 0, 0.05);
                 text-align: center;
                 flex-shrink: 0;
                 background: rgba(255, 255, 255, 0.02);
@@ -351,7 +307,7 @@ async function renderizarAhora(contenedor, datosCuenta) {
             .ahora-titulo {
                 font-size: 16px;
                 font-weight: 700;
-                color: rgba(255, 255, 255, 0.9);
+                color: #1c1c1e;
                 margin-bottom: 2px;
             }
             .ahora-badge {
@@ -364,56 +320,90 @@ async function renderizarAhora(contenedor, datosCuenta) {
                 font-weight: 600;
                 letter-spacing: 0.5px;
             }
-            .ahora-scroll {
+            .ahora-tabla-wrapper {
                 overflow-y: auto;
                 overflow-x: hidden;
                 -webkit-overflow-scrolling: touch;
                 flex: 1;
-                padding: 12px 12px 8px 12px;
+                padding: 4px 12px 4px 12px;
             }
-            .ahora-scroll::-webkit-scrollbar {
+            .ahora-tabla-wrapper::-webkit-scrollbar {
                 width: 3px;
             }
-            .ahora-scroll::-webkit-scrollbar-track {
+            .ahora-tabla-wrapper::-webkit-scrollbar-track {
                 background: transparent;
             }
-            .ahora-scroll::-webkit-scrollbar-thumb {
-                background: rgba(255, 255, 255, 0.15);
+            .ahora-tabla-wrapper::-webkit-scrollbar-thumb {
+                background: rgba(0, 0, 0, 0.15);
                 border-radius: 4px;
+            }
+            .ahora-tabla {
+                width: 100%;
+                border-collapse: collapse;
+                table-layout: fixed;
+            }
+            .ahora-tabla th {
+                padding: 8px 4px 6px 4px;
+                text-align: center;
+                color: #8e8e93;
+                font-weight: 600;
+                font-size: 11px;
+                border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            }
+            .ahora-tabla th:nth-child(1),
+            .ahora-tabla td:nth-child(1) {
+                width: 28%;
+            }
+            .ahora-tabla th:nth-child(2),
+            .ahora-tabla td:nth-child(2) {
+                width: 44%;
+            }
+            .ahora-tabla th:nth-child(3),
+            .ahora-tabla td:nth-child(3) {
+                width: 28%;
+            }
+            .ahora-fila:hover {
+                background: rgba(0, 0, 0, 0.03);
+                transition: background 0.2s ease;
+            }
+            .ahora-fila:active {
+                transform: scale(0.99);
             }
             .ahora-footer {
                 padding: 10px;
                 text-align: center;
-                border-top: 1px solid rgba(255, 255, 255, 0.04);
+                border-top: 1px solid rgba(0, 0, 0, 0.04);
                 font-size: 9px;
-                color: rgba(255, 255, 255, 0.2);
+                color: rgba(0, 0, 0, 0.2);
                 flex-shrink: 0;
                 letter-spacing: 0.3px;
-            }
-            .ahora-bloque {
-                cursor: pointer;
-                transition: all 0.2s ease;
-            }
-            .ahora-bloque:hover {
-                background: rgba(240, 240, 240, 0.95);
-                border-color: rgba(0, 122, 255, 0.2);
-            }
-            .ahora-bloque:active {
-                transform: scale(0.99);
+                background: rgba(255, 255, 255, 0.02);
             }
             @media (max-width: 600px) {
                 .ahora-container {
                     max-height: calc(100vh - 120px);
                     border-radius: 16px;
                 }
-                .ahora-scroll {
-                    padding: 8px 8px 4px 8px;
+                .ahora-tabla-wrapper {
+                    padding: 2px 8px 2px 8px;
                 }
-                .ahora-bloque {
-                    padding: 10px 8px;
+                .ahora-tabla td {
+                    padding: 6px 3px;
                 }
-                .ahora-bloque div[style*="grid-template-columns"] {
-                    gap: 1px !important;
+                .ahora-tabla td div span:first-child {
+                    font-size: 26px;
+                }
+                .ahora-tabla td div span:nth-child(2) {
+                    font-size: 10px;
+                }
+                .ahora-countdown {
+                    font-size: 9px;
+                }
+                .ahora-header {
+                    padding: 10px 8px 8px 8px;
+                }
+                .ahora-titulo {
+                    font-size: 14px;
                 }
             }
         </style>
@@ -424,28 +414,42 @@ async function renderizarAhora(contenedor, datosCuenta) {
                 <span class="ahora-badge">🎯 HAZ TUS PRONÓSTICOS</span>
             </div>
             
-            <div class="ahora-scroll" id="ahora-scroll">
-                ${bloquesHtml}
+            <div class="ahora-tabla-wrapper">
+                <table class="ahora-tabla">
+                    <thead>
+                        <tr>
+                            <th>LOCAL</th>
+                            <th>VS</th>
+                            <th>VISITANTE</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filasHtml}
+                    </tbody>
+                </table>
             </div>
             
             <div class="ahora-footer">
-                💡 Haz clic en cualquier bloque para pronosticar
+                💡 Haz clic en cualquier fila para pronosticar
             </div>
         </div>
     `;
     
-    document.querySelectorAll('.ahora-bloque').forEach(bloque => {
-        bloque.addEventListener('click', function() {
+    // ========== EVENTO: CLICK EN FILA → REDIRIGIR A PARTIDOS ==========
+    document.querySelectorAll('.ahora-fila').forEach(fila => {
+        fila.addEventListener('click', function() {
             if (globalCambiarVistaCallback) {
                 globalCambiarVistaCallback('partidos', currentJugador, null, 'todos');
             }
         });
     });
     
+    // ========== INICIAR COUNTDOWN ==========
     if (document.querySelectorAll('.ahora-countdown').length > 0) {
         iniciarCountdownAhora();
     }
     
+    // ========== VISIBILITY HANDLER ==========
     const visibilityHandler = () => {
         if (document.hidden) {
             detenerCountdownAhora();
