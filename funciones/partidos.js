@@ -1,4 +1,4 @@
- // funciones/partidos.js
+// funciones/partidos.js
 // Módulo de Partidos - La Polla Mundialista 2026
 // VERSIÓN COMPLETA CON:
 // - ✅ Sistema de PULSO (multiplicador de puntos según campo 'pul' de Velneo)
@@ -19,7 +19,7 @@
 // - ✅ Captura correcta de la selección de alargue al guardar
 // - ✅ pro_res se sobrescribe correctamente con la selección de alargue
 // - ✅ pro_res se guarda en pronosticosCache
-// - ✅ INDICADOR "⭐ avanza en alargue" en cards de partidos
+// - ✅ INDICADOR "⭐ avanza en alargue" en cards de partidos (color AZUL)
 // - ✅ Modal carga pronóstico existente (inputs y selector de alargue)
 // - ✅ Modal de partido terminado con desglose de puntos
 // - ✅ Badge "MARCADOR 90 MINUTOS" debajo de la cancha en el modal
@@ -43,6 +43,7 @@
 // - ✅ Botón único "Cerrar" (eliminado botón redundante con pronóstico)
 // - ✅ Bonus Alargue solo se muestra si REALMENTE hubo alargue (empate en 90 minutos)
 // - ✅ Bonus Alargue cuando no hubo alargue: "0 pts ❌"
+// - ✅ Texto "⭐ X avanza en alargue" en CARDS (fuera del modal) también en AZUL
 
 import { onSimuladorCambio, simGetFechaStr, simGetHoraStr } from './lab.js';
 import { gruposSeleccion } from './especiales.js';
@@ -1197,10 +1198,11 @@ async function renderPartidoCard(partido, fechaSim, horaSim, tipoFondo, esPrimer
             const avanzaLocal = pro_res === '1';
             const avanzaVisita = pro_res === '2';
             
+            // ========== COLOR AZUL PARA CARDS (fuera del modal) ==========
             if (avanzaVisita && Number(partido.fas) >= 2) {
-                alargueInfo = `<div style="display:flex;justify-content:center;align-items:center;gap:4px;margin-top:4px;font-size:10px;color:#f1c40f;font-weight:600;">⭐ ${partido.nom_vis} avanza en alargue</div>`;
+                alargueInfo = `<div style="display:flex;justify-content:center;align-items:center;gap:4px;margin-top:4px;font-size:10px;color:#007aff;font-weight:600;">⭐ ${partido.nom_vis} avanza en alargue</div>`;
             } else if (avanzaLocal && Number(partido.fas) >= 2) {
-                alargueInfo = `<div style="display:flex;justify-content:center;align-items:center;gap:4px;margin-top:4px;font-size:10px;color:#f1c40f;font-weight:600;">⭐ ${partido.nom_loc} avanza en alargue</div>`;
+                alargueInfo = `<div style="display:flex;justify-content:center;align-items:center;gap:4px;margin-top:4px;font-size:10px;color:#007aff;font-weight:600;">⭐ ${partido.nom_loc} avanza en alargue</div>`;
             }
             
             pronosticoHTML = `<div class="pronostico-container">
