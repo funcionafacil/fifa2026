@@ -2,13 +2,15 @@
 // Módulo de Partidos - La Polla Mundialista 2026
 // VERSIÓN COMPLETA CON CORRECCIONES:
 // - ✅ Bonus Alargue sumado al TOTAL en cards y modal
-// - ✅ Badge "⭐ X avanza en alargue" visible en cards TERMINADAS
+// - ✅ Badge "⭐ X avanza" (sin "en alargue") para partidos sin alargue
+// - ✅ Badge "⭐ X avanza en alargue" SOLO cuando hubo alargue
 // - ✅ Total de puntos en cards TERMINADAS incluye Bonus Alargue (ej: 24 pts)
 // - ✅ Modal muestra "RESULTADO 90 MINUTOS" y "ALARGUE" por separado
 // - ✅ Si hubo alargue, muestra marcador FINAL del alargue (con goles)
-// - ✅ Si NO hubo alargue, muestra badge "⭐ X avanza en alargue" (cuando aplica)
 // - ✅ CORREGIDO: Australia-Egipto (1-1 sin goles en alargue) muestra "1-1" en alargue
 // - ✅ CORREGIDO: Bélgica-Senegal (2-2 → 3-2) muestra "3-2" en alargue
+// - ✅ CORREGIDO: España-Austria (3-0 sin alargue) muestra "⭐ España avanza"
+// - ✅ CORREGIDO: Eliminado "Resultado real:" redundante en cards (el resultado ya está arriba)
 // - ✅ Sistema de PULSO (multiplicador de puntos según campo 'pul' de Velneo)
 // - ✅ Para partidos TERMINADOS, ignora cache local y siempre consulta API fresca
 // - ✅ Forzar actualización de 'pul' cuando el partido está en est=4
@@ -47,16 +49,13 @@
 // - ✅ Al hacer clic en 2do tiempo → toast "No se aceptan más pronósticos"
 // - ✅ Al hacer clic en pendiente → modal de pronóstico PULSO 100
 // - ✅ Modal partido terminado: sección "RESULTADO 90 MINUTOS" y "ALARGUE" separadas
-// - ✅ Badge "⭐ X avanza en alargue" en sección de pronóstico con color AZUL (#007aff)
+// - ✅ Badge "⭐ X avanza" (sin "en alargue") para partidos sin alargue
 // - ✅ Botón único "Cerrar" (eliminado botón redundante con pronóstico)
 // - ✅ Bonus Alargue se calcula usando el campo 'res' de Velneo (quién avanzó realmente)
 // - ✅ Bonus Alargue cuando no se acierta: "0 pts ❌"
 // - ✅ Texto "⭐ X avanza en alargue" en CARDS (fuera del modal) también en AZUL
 // - ✅ Los puntos totales coinciden con lo que devuelve Velneo
-// - ✅ CORREGIDO: Cards TERMINADAS muestran "⭐ X avanza en alargue"
-// - ✅ CORREGIDO: Cards TERMINADAS suman Bonus Alargue al total (ej: 24 pts)
-// - ✅ CORREGIDO: Modal muestra "RESULTADO 90 MINUTOS" y "ALARGUE" por separado
-// - ✅ CORREGIDO: Alargue muestra marcador FINAL con goles del alargue
+// - ✅ CORREGIDO: Eliminado "Resultado real:" redundante en cards
 
 import { onSimuladorCambio, simGetFechaStr, simGetHoraStr } from './lab.js';
 import { gruposSeleccion } from './especiales.js';
@@ -655,6 +654,14 @@ function mostrarModalResultadoTerminado(partido, pronostico) {
         }
     }
     
+    // ========== TEXTO DE AVANCE SEGÚN SI HUBO ALARGUE ==========
+    let avanceRealTexto = '';
+    if (huboAlargue) {
+        avanceRealTexto = `⭐ ${avanzaRealNombre} avanza en alargue`;
+    } else if (avanzaReal !== 'empate') {
+        avanceRealTexto = `⭐ ${avanzaRealNombre} avanza`;
+    }
+    
     // ========== DETERMINAR QUIÉN AVANZA SEGÚN EL PRONÓSTICO ==========
     let avanzaTexto = '';
     let avanzaBandera = '';
@@ -791,10 +798,10 @@ function mostrarModalResultadoTerminado(partido, pronostico) {
                         <div style="font-size:12px;font-weight:600;color:#1c1c1e;">${partido.nom_vis}</div>
                     </div>
                 </div>
-                ${avanzaRealNombre && esFaseFinal ? `
+                ${avanceRealTexto ? `
                     <div style="text-align:center;margin-top:8px;">
                         <span style="font-size:11px;font-weight:600;color:#007aff;background:rgba(0,122,255,0.08);padding:4px 12px;border-radius:20px;">
-                            ⭐ ${avanzaRealNombre} avanza en alargue
+                            ${avanceRealTexto}
                         </span>
                     </div>
                 ` : ''}
@@ -1361,6 +1368,7 @@ async function renderPartidoCard(partido, fechaSim, horaSim, tipoFondo, esPrimer
             // ✅ Badge de alargue en la card para partidos TERMINADOS
             const alargueInfoHTML = alargueBadge ? `<div style="display:flex;justify-content:center;align-items:center;gap:4px;margin-top:4px;font-size:10px;color:#007aff;font-weight:600;">${alargueBadge}</div>` : '';
             
+            // ========== CARD TERMINADA - SIN "Resultado real:" ==========
             pronosticoHTML = `<div class="pronostico-container"><div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:12px;">
                 <span style="font-size:11px;color:#8e8e93;flex-shrink:0;">Tu pronóstico:</span>
                 <div style="flex:1;display:flex;justify-content:center;flex-direction:column;align-items:center;">
@@ -1375,15 +1383,6 @@ async function renderPartidoCard(partido, fechaSim, horaSim, tipoFondo, esPrimer
                     <span style="font-size:13px;font-weight:800;color:#c0392b;">${totalConPulso} pts</span>
                     ${pulsoHTML}
                 </div>
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:12px;">
-                <span style="font-size:11px;color:#8e8e93;flex-shrink:0;">Resultado real:</span>
-                <div style="flex:1;display:flex;justify-content:center;">
-                    <div style="background:#eafaf1;border-radius:10px;padding:6px 16px;display:inline-block;">
-                        <span style="font-size:16px;font-weight:700;color:#34c759;">${realLocal} - ${realVisita}</span>
-                    </div>
-                </div>
-                <div style="width:70px;flex-shrink:0;"></div>
             </div></div>`;
         } else {
             let alargueInfo = '';
