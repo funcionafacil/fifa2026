@@ -1,5 +1,6 @@
 // funciones/frontpage.js
 // VERSIÓN COMPLETA CON HEADER REDISEÑADO Y RESPONSIVE
+// ✅ Eliminada dependencia de cruces.js
 
 import { inicializarMenu } from './menu.js';
 import { renderizarLab, onSimuladorCambio } from './lab.js';
@@ -11,7 +12,8 @@ import { renderizarTabla } from './tabla.js';
 import { renderizarAhora, setCambiarVistaCallback as setAhoraCambiarVistaCallback, suscribirAhoraAlSimulador } from './ahora.js';
 // import { renderizarReglas, setCambiarVistaCallback as setReglasCallback } from './reglas.js';
 import { renderizarTV } from './tv.js';
-import { renderizarCruces } from './cruces.js';
+// ❌ Eliminada importación de cruces.js
+// import { renderizarCruces } from './cruces.js';
 import { 
   guardarPronosticosPartidosLocal, 
   guardarPronosticosEspecialesLocal,
@@ -43,7 +45,6 @@ function cambiarVistaPrincipal(opcion, datosCuenta, tabEspecial = null, tabParti
                 renderizarAhora(contenidoContainer, datosCuenta);
                 break;
             case 'partidos':
-                // Pasar scrollToId para scroll automático
                 renderizarPartidos(contenidoContainer, datosCuenta, tabPartidos || 'todos', scrollToId);
                 break;
             case 'especiales':
@@ -53,9 +54,10 @@ function cambiarVistaPrincipal(opcion, datosCuenta, tabEspecial = null, tabParti
                     renderizarEspeciales(contenidoContainer, datosCuenta);
                 }
                 break;
-            case 'cruces':
-                renderizarCruces(contenidoContainer, datosCuenta);
-                break;
+            // ❌ Eliminado case 'cruces'
+            // case 'cruces':
+            //     renderizarCruces(contenidoContainer, datosCuenta);
+            //     break;
             // case 'reglas':
             //     renderizarReglas(contenidoContainer, datosCuenta);
             //     break;
@@ -283,10 +285,8 @@ export async function cargarFrontpage(datosCuenta) {
     box-sizing:border-box;
   `;
   
-  // ========== HEADER REDISEÑADO ==========
   frontpageCard.innerHTML = `
     <style>
-      /* ========== HEADER RESPONSIVE ========== */
       .fp-header-premium { 
         display:flex; 
         align-items:center; 
@@ -371,7 +371,6 @@ export async function cargarFrontpage(datosCuenta) {
         transform: scale(0.98);
       }
       
-      /* ========== BODY ========== */
       .fp-content-body { 
         flex: 1; 
         display: flex; 
@@ -388,7 +387,6 @@ export async function cargarFrontpage(datosCuenta) {
         -webkit-overflow-scrolling: touch;
       }
       
-      /* ========== DESKTOP MENU ========== */
       @media (min-width: 769px) {
         .fp-body-zone-menu { 
           width: clamp(200px, 22vw, 280px);
@@ -415,7 +413,6 @@ export async function cargarFrontpage(datosCuenta) {
         }
       }
       
-      /* ========== MOBILE MENU ========== */
       @media (max-width: 768px) {
         .fp-content-body { 
           flex-direction: column; 
@@ -511,7 +508,6 @@ export async function cargarFrontpage(datosCuenta) {
         min-width: 200px;
       }
       
-      /* ========== RESPONSIVE GLOBAL ========== */
       body, html {
         overflow: hidden !important;
         height: 100% !important;
@@ -535,7 +531,6 @@ export async function cargarFrontpage(datosCuenta) {
       }
     </style>
     
-    <!-- ========== HEADER REDISEÑADO ========== -->
     <header class="fp-header-premium">
       <div class="fp-header-left">
         <div class="fp-nombre-wrapper" style="display:flex;align-items:center;flex-wrap:wrap;gap:clamp(2px,0.4vw,6px);">
@@ -560,11 +555,12 @@ export async function cargarFrontpage(datosCuenta) {
     </div>
   `;
 
-  // ========== OPCIONES DEL MENÚ ==========
+  // ✅ OPCIONES DEL MENÚ - CRUCES ELIMINADO
   const opcionesMenu = [
     { id: 'ahora', nombre: 'AHORA', color: '#34c759', icono: '🏠' },
     { id: 'partidos', nombre: 'PARTIDOS', color: '#007aff', icono: '⚽' },
     { id: 'especiales', nombre: 'ESPECIALES', color: '#af52de', icono: '⭐' },
+    // ❌ CRUCES eliminado - no existe el archivo
     // { id: 'cruces', nombre: 'CRUCES', color: '#f5c842', icono: '🏆' },
     // { id: 'reglas', nombre: 'REGLAS', color: '#5856d6', icono: '📖' },
     { id: 'tabla', nombre: 'TABLA', color: '#ff9500', icono: '📊' },
@@ -595,10 +591,12 @@ export async function cargarFrontpage(datosCuenta) {
   
   const mobileTabBar = document.getElementById('mobile-tab-bar');
   if (mobileTabBar) {
+    // ✅ OPCIONES MÓVIL - CRUCES ELIMINADO
     const opcionesMovil = [
       { id: 'ahora', icono: '🏠', label: 'AHORA' },
       { id: 'partidos', icono: '⚽', label: 'PARTIDOS' },
       { id: 'especiales', icono: '⭐', label: 'ESPECIALES' },
+      // ❌ CRUCES eliminado
       // { id: 'cruces', icono: '🏆', label: 'CRUCES' },
       // { id: 'reglas', icono: '📖', label: 'REGLAS' },
       { id: 'tabla', icono: '📊', label: 'TABLA' }
