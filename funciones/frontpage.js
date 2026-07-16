@@ -32,7 +32,7 @@ function urlWithTimestamp(url) {
   return `${url}${separator}_=${Date.now()}`;
 }
 
-function cambiarVistaPrincipal(opcion, datosCuenta, tabEspecial = null, tabPartidos = null) {
+function cambiarVistaPrincipal(opcion, datosCuenta, tabEspecial = null, tabPartidos = null, scrollToId = null) {
     const contenidoContainer = document.getElementById('fp-body-contenido');
     if (!contenidoContainer) return;
     
@@ -43,7 +43,8 @@ function cambiarVistaPrincipal(opcion, datosCuenta, tabEspecial = null, tabParti
                 renderizarAhora(contenidoContainer, datosCuenta);
                 break;
             case 'partidos':
-                renderizarPartidos(contenidoContainer, datosCuenta, tabPartidos || 'todos');
+                // Pasar scrollToId para scroll automático
+                renderizarPartidos(contenidoContainer, datosCuenta, tabPartidos || 'todos', scrollToId);
                 break;
             case 'especiales':
                 if (tabEspecial) {
@@ -93,7 +94,7 @@ async function cargarDatosIniciales(jugadorId) {
     const equiposCache = dataEquipos.fifa_equ || [];
     guardarEquiposCacheLocal(equiposCache);
     
-    const partidosUrl = urlWithTimestamp(`${BASE_V2}/fifa_jug_pro?api_key=${KEY}&filter[id]=${jugadorId}&fields=jug,jug.name,id,ptd,pro_gol_loc,pro_gol_vis,pro_res,pul&filterQuery[ptd.cic]=1`);
+    const partidosUrl = urlWithTimestamp(`${BASE}/fifa_jug_pro?api_key=${KEY}&filter[id]=${jugadorId}&fields=jug,jug.name,id,ptd,pro_gol_loc,pro_gol_vis,pro_res,pul&_=${timestamp}`);
     console.log('[Sync] Fetching partidos:', partidosUrl);
     const responsePartidos = await fetch(partidosUrl);
     if (!responsePartidos.ok) throw new Error('Error cargando partidos');
@@ -241,8 +242,8 @@ export async function cargarFrontpage(datosCuenta) {
   
   onSimuladorCambio((fecha, hora) => console.log('📅 Simulador actualizado:', fecha, hora));
   
-  globalCambiarVista = (opcion, cuenta, tabEspecial = null, tabPartidos = null) => 
-    cambiarVistaPrincipal(opcion, cuenta, tabEspecial, tabPartidos);
+  globalCambiarVista = (opcion, cuenta, tabEspecial = null, tabPartidos = null, scrollToId = null) => 
+    cambiarVistaPrincipal(opcion, cuenta, tabEspecial, tabPartidos, scrollToId);
   
   setAhoraCambiarVistaCallback(globalCambiarVista);
   // setReglasCallback(globalCambiarVista);
